@@ -3,6 +3,10 @@ import zipfile
 import os
 import time
 import json
+import urllib3
+
+# התעלמות מאזהרות SSL
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # הגדרות
 REPO_OWNER = "imanuel300"
@@ -16,7 +20,7 @@ def get_latest_commit():
     """מקבל את המזהה של הקומיט האחרון"""
     api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/commits/main"
     headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
-    response = requests.get(api_url, headers=headers)
+    response = requests.get(api_url, headers=headers, verify=False)
     if response.status_code == 200:
         return response.json()['sha']
     return None
@@ -38,7 +42,7 @@ def deploy_latest_version():
     """מוריד ופורס את הגרסה האחרונה"""
     zip_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/main.zip"
     headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
-    response = requests.get(zip_url, headers=headers)
+    response = requests.get(zip_url, headers=headers, verify=False)
     
     if response.status_code == 200:
         # שמירת הקובץ ZIP

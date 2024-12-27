@@ -12,7 +12,7 @@
 
 ### 1. התקנת חבילות Python הנדרשות
 
-    pip3 install requests
+    pip3 install requests urllib3
 
 ### 2. הגדרת תיקיות ומיקומים
 
