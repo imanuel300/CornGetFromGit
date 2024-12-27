@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 User=www-data
-WorkingDirectory=/opt/update_checker
-Environment="PATH=/usr/local/bin"
-ExecStart=/usr/local/bin/python3 check_updates.py
+WorkingDirectory=/var/www/html/CornGetFromGit
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/python3 check_updates.py
 Restart=always
 
 [Install]

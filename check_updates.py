@@ -10,8 +10,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # הגדרות
 REPO_OWNER = "imanuel300"
-REPO_NAME = "demo-project"
-DEPLOY_PATH = "/var/www/demo-project"
+REPO_NAME = "CornGetFromGit"
+DEPLOY_PATH = "/var/www/html/CornGetFromGit"
 CHECK_INTERVAL = 300  # בדיקה כל 5 דקות
 STATE_FILE = "last_commit.json"
 GITHUB_TOKEN = "your-github-token"
@@ -56,12 +56,12 @@ def deploy_latest_version():
             
         # העברת הקבצים למיקום הסופי
         extracted_dir = f"/tmp/{REPO_NAME}-main"
-        os.system(f"rm -rf {DEPLOY_PATH}/*")
-        os.system(f"mv {extracted_dir}/* {DEPLOY_PATH}/")
+        os.system(f"/bin/rm -rf {DEPLOY_PATH}/*")
+        os.system(f"/bin/mv {extracted_dir}/* {DEPLOY_PATH}/")
         
         # ניקוי קבצים זמניים
         os.remove(zip_path)
-        os.system(f"rm -rf {extracted_dir}")
+        os.system(f"/bin/rm -rf {extracted_dir}")
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התקנה הושלמה בהצלחה")
         return True

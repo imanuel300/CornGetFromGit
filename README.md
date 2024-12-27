@@ -16,23 +16,19 @@
 
 ### 2. הגדרת תיקיות ומיקומים
 
-    # יצירת תיקיית העבודה
-    sudo mkdir /opt/update_checker
-    sudo chown www-data:www-data /opt/update_checker
-
-    # יצירת תיקיית היעד לפרויקט
-    sudo mkdir -p /var/www/demo-project
-    sudo chown www-data:www-data /var/www/demo-project
+    # יצירת תיקיית היעד לפרויקט אם לא קיימת
+    sudo mkdir -p /var/www/html/CornGetFromGit
+    sudo chown www-data:www-data /var/www/html/CornGetFromGit
 
 ### 3. העתקת קבצים
 
-    sudo cp check_updates.py /opt/update_checker/
+    sudo cp check_updates.py /var/www/html/CornGetFromGit/
     sudo cp update_checker.service /etc/systemd/system/
 
 ### 4. הגדרת הרשאות
 
-    sudo chown www-data:www-data /opt/update_checker/check_updates.py
-    sudo chmod 755 /opt/update_checker/check_updates.py
+    sudo chown www-data:www-data /var/www/html/CornGetFromGit/check_updates.py
+    sudo chmod 755 /var/www/html/CornGetFromGit/check_updates.py
 
 ### 5. הפעלת השירות
 
