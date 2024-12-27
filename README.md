@@ -44,10 +44,19 @@
 
 יש לעדכן את הפרמטרים הבאים בקובץ `check_updates.py`:
 
-    REPO_OWNER = "demo-user"        # שם המשתמש או הארגון בגיטהאב
+    REPO_OWNER = "imanuel300"        # שם המשתמש או הארגון בגיטהאב
     REPO_NAME = "demo-project"      # שם המאגר
     DEPLOY_PATH = "/var/www/demo-project"  # נתיב התיקייה בה יותקנו הקבצים
     CHECK_INTERVAL = 300            # תדירות הבדיקה בשניות (300 = 5 דקות)
+
+### הגדרות למאגר פרטי
+
+אם המאגר הוא פרטי, יש ליצור Personal Access Token ב-GitHub:
+1. לך ל-Settings -> Developer settings -> Personal access tokens
+2. צור token חדש עם הרשאות `repo`
+3. העתק את ה-token והוסף אותו לקובץ:
+
+    GITHUB_TOKEN = "your-github-token"  # הכנס כאן את ה-token שיצרת
 
 ## בדיקת סטטוס
 

@@ -5,16 +5,18 @@ import time
 import json
 
 # הגדרות
-REPO_OWNER = "demo-user"
+REPO_OWNER = "imanuel300"
 REPO_NAME = "demo-project"
 DEPLOY_PATH = "/var/www/demo-project"
 CHECK_INTERVAL = 300  # בדיקה כל 5 דקות
 STATE_FILE = "last_commit.json"
+GITHUB_TOKEN = "your-github-token"
 
 def get_latest_commit():
     """מקבל את המזהה של הקומיט האחרון"""
     api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/commits/main"
-    response = requests.get(api_url)
+    headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
+    response = requests.get(api_url, headers=headers)
     if response.status_code == 200:
         return response.json()['sha']
     return None
@@ -35,7 +37,8 @@ def load_state():
 def deploy_latest_version():
     """מוריד ופורס את הגרסה האחרונה"""
     zip_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/main.zip"
-    response = requests.get(zip_url)
+    headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
+    response = requests.get(zip_url, headers=headers)
     
     if response.status_code == 200:
         # שמירת הקובץ ZIP
