@@ -10,11 +10,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # הגדרות
 REPO_OWNER = "imanuel300"
-REPO_NAME = "CornGetFromGit"
-DEPLOY_PATH = "/var/www/html/CornGetFromGit"
+REPO_NAME = "TranslateDocs"
+DEPLOY_PATH = "/var/www/html/TranslateDocs"
 CHECK_INTERVAL = 300  # בדיקה כל 5 דקות
 STATE_FILE = "last_commit.json"
-GITHUB_TOKEN = "your-github-token"
+GITHUB_TOKEN = ""
 
 def get_latest_commit():
     """מקבל את המזהה של הקומיט האחרון"""
@@ -56,19 +56,20 @@ def deploy_latest_version():
             
         # העברת הקבצים למיקום הסופי
         extracted_dir = f"/tmp/{REPO_NAME}-main"
-        os.system(f"/bin/rm -rf {DEPLOY_PATH}/*")
-        os.system(f"/bin/mv {extracted_dir}/* {DEPLOY_PATH}/")
+        os.system(f"sudo /bin/rm -rf {DEPLOY_PATH}/*")
+        os.system(f"sudo /bin/mv {extracted_dir}/* {DEPLOY_PATH}/")
         
         # ניקוי קבצים זמניים
         os.remove(zip_path)
-        os.system(f"/bin/rm -rf {extracted_dir}")
+        os.system(f"sudo /bin/rm -rf {extracted_dir}")
         
         # שינוי הרשאות והרצת setup.sh מהתיקייה הנכונה
-        current_dir = os.getcwd()  # שמירת התיקייה הנוכחית
-        os.chdir(DEPLOY_PATH)      # מעבר לתיקיית היעד
-        os.system("chmod +x setup.sh")
-        os.system("./setup.sh production")
-        os.chdir(current_dir)      # חזרה לתיקייה המקורית
+        current_dir = os.getcwd()
+        os.chdir(DEPLOY_PATH)
+        os.system("sudo chmod +x setup.sh")
+        os.system("sudo ./setup.sh production")
+        os.system(f"sudo chown -R www-data:www-data {DEPLOY_PATH}")
+        os.chdir(current_dir)
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התקנה הושלמה בהצלחה")
         return True
