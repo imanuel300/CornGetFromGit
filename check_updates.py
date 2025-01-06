@@ -11,7 +11,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # הגדרות
 REPO_OWNER = "imanuel300"
 REPO_NAME = "TranslateDocs"
-DEPLOY_PATH = "/var/www/html/TranslateDocs"
+DEPLOY_PATH = "/var/www/html/bedrock-translate"
 CHECK_INTERVAL = 300  # בדיקה כל 5 דקות
 STATE_FILE = "last_commit.json"
 GITHUB_TOKEN = ""
@@ -56,19 +56,19 @@ def deploy_latest_version():
             
         # העברת הקבצים למיקום הסופי
         extracted_dir = f"/tmp/{REPO_NAME}-main"
-        os.system(f"sudo /bin/rm -rf {DEPLOY_PATH}/*")
-        os.system(f"sudo /bin/mv {extracted_dir}/* {DEPLOY_PATH}/")
+        os.system(f"sudo -n /bin/rm -rf {DEPLOY_PATH}/*")
+        os.system(f"sudo -n /bin/mv {extracted_dir}/* {DEPLOY_PATH}/")
         
         # ניקוי קבצים זמניים
         os.remove(zip_path)
-        os.system(f"sudo /bin/rm -rf {extracted_dir}")
+        os.system(f"sudo -n /bin/rm -rf {extracted_dir}")
         
         # שינוי הרשאות והרצת setup.sh מהתיקייה הנכונה
         current_dir = os.getcwd()
         os.chdir(DEPLOY_PATH)
-        os.system("sudo chmod +x setup.sh")
-        os.system("sudo ./setup.sh production")
-        os.system(f"sudo chown -R www-data:www-data {DEPLOY_PATH}")
+        os.system("sudo -n chmod +x setup.sh")
+        os.system("sudo -n ./setup.sh production")
+        os.system(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
         os.chdir(current_dir)
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התקנה הושלמה בהצלחה")
