@@ -82,7 +82,7 @@ def deploy_latest_version():
         
         # הרצת הסקריפט
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] מריץ את setup.sh")
-        os.system("sudo -n ./setup.sh production")
+        os.system("./setup.sh production")
         os.system(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
         os.chdir(current_dir)
         
