@@ -62,8 +62,13 @@ def deploy_latest_version():
         # ניקוי קבצים זמניים
         os.remove(zip_path)
         os.system(f"/bin/rm -rf {extracted_dir}")
-        os.system(f"chmod +x {DEPLOY_PATH}/setup.sh")
-        os.system(f"{DEPLOY_PATH}/setup.sh production")
+        
+        # שינוי הרשאות והרצת setup.sh מהתיקייה הנכונה
+        current_dir = os.getcwd()  # שמירת התיקייה הנוכחית
+        os.chdir(DEPLOY_PATH)      # מעבר לתיקיית היעד
+        os.system("chmod +x setup.sh")
+        os.system("./setup.sh production")
+        os.chdir(current_dir)      # חזרה לתיקייה המקורית
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התקנה הושלמה בהצלחה")
         return True
