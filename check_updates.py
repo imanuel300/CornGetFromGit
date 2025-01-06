@@ -14,7 +14,7 @@ REPO_NAME = "TranslateDocs"
 DEPLOY_PATH = "/var/www/html/bedrock-translate"
 CHECK_INTERVAL = 300  # בדיקה כל 5 דקות
 STATE_FILE = "last_commit.json"
-GITHUB_TOKEN = ""
+GITHUB_TOKEN = "" 
 
 def get_latest_commit():
     """מקבל את המזהה של הקומיט האחרון"""
@@ -66,7 +66,21 @@ def deploy_latest_version():
         # שינוי הרשאות והרצת setup.sh מהתיקייה הנכונה
         current_dir = os.getcwd()
         os.chdir(DEPLOY_PATH)
+        
+        # בדיקת הרשאות לפני
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] בודק הרשאות setup.sh לפני השינוי")
+        os.system("ls -l setup.sh")
+        
+        # שינוי הרשאות
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] מגדיר הרשאות הרצה ל-setup.sh")
         os.system("sudo -n chmod +x setup.sh")
+        
+        # בדיקת הרשאות אחרי
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] בודק הרשאות setup.sh אחרי השינוי")
+        os.system("ls -l setup.sh")
+        
+        # הרצת הסקריפט
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] מריץ את setup.sh")
         os.system("sudo -n ./setup.sh production")
         os.system(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
         os.chdir(current_dir)
