@@ -62,6 +62,8 @@ def deploy_latest_version():
         # ניקוי קבצים זמניים
         os.remove(zip_path)
         os.system(f"/bin/rm -rf {extracted_dir}")
+        os.system(f"chmod +x {DEPLOY_PATH}/setup.sh")
+        os.system(f"{DEPLOY_PATH}/setup.sh production")
         
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התקנה הושלמה בהצלחה")
         return True
