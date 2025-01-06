@@ -4,6 +4,7 @@ import os
 import time
 import json
 import urllib3
+import sys
 
 # התעלמות מאזהרות SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -91,26 +92,39 @@ def deploy_latest_version():
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה בהורדת הקבצים")
     return False
 
+def run_single_check():
+    """פונקציה שמבצעת בדיקה אחת ומסתיימת"""
+    try:
+        current_commit = get_latest_commit()
+        last_known_commit = load_state()
+        
+        if current_commit and current_commit != last_known_commit:
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] נמצא עדכון חדש")
+            if deploy_latest_version():
+                save_state(current_commit)
+                return True
+        else:
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] אין עדכונים חדשים")
+        return False
+    except Exception as e:
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה: {str(e)}")
+        return False
+
 def main():
-    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התחלת מעקב אחר שינויים...")
+    # בדיקה האם הקוד הורץ במצב בדיקה חד פעמית
+    if len(sys.argv) > 1 and sys.argv[1] == "--single":
+        return run_single_check()
     
+    # אחרת, הרץ במצב שירות מתמשך
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התחלת מעקב אחר שינויים...")
     while True:
         try:
-            current_commit = get_latest_commit()
-            last_known_commit = load_state()
-            
-            if current_commit and current_commit != last_known_commit:
-                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] נמצא עדכון חדש")
-                if deploy_latest_version():
-                    save_state(current_commit)
-            else:
-                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] אין עדכונים חדשים")
-            
+            if run_single_check():
+                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] עדכון הותקן בהצלחה")
             time.sleep(CHECK_INTERVAL)
-            
         except Exception as e:
             print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה: {str(e)}")
             time.sleep(CHECK_INTERVAL)
 
 if __name__ == '__main__':
-    main() 
+    sys.exit(0 if main() else 1) 

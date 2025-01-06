@@ -1,6 +1,6 @@
 # מערכת עדכון אוטומטית מ-GitHub
 
-מערכת זו מאפשרת עדכון אוטומטי של קבצי פרויקט מ-GitHub לשרת Linux. המערכת בודקת באופן תקופתי אם יש עדכונים חדשים במאגר, ואם כן - מורידה ומתקינה אותם.
+מערכת זו מאפשרת עדכון אוטומטי של קבצי פרויקט מ-GitHub לשרת Linux. המערכת בכולה לפעול הן כשירות רקע והן בהפעלה ידנית חד פעמית.
 
 ## דרישות מערכת
 - Python 3.6 ומעלה
@@ -22,8 +22,13 @@
 
 ### 3. העתקת קבצים
 
+    # העתקת קבצי המערכת
     sudo cp check_updates.py /var/www/html/CornGetFromGit/
     sudo cp update_checker.service /etc/systemd/system/
+
+    # העתקת סקריפט ההפעלה הידנית
+    sudo cp check_update.sh /usr/local/bin/
+    sudo chmod +x /usr/local/bin/check_update.sh
 
 ### 4. הגדרת הרשאות
 
@@ -36,17 +41,30 @@
     sudo systemctl enable update_checker
     sudo systemctl start update_checker
 
+## שימוש
+
+### הפעלה אוטומטית
+השירות רץ ברקע ובודק עדכונים כל 5 דקות. ניתן לבדוק את סטטוס השירות:
+
+    sudo systemctl status update_checker
+
+### הפעלה ידנית
+לבדיקת עדכונים באופן חד פעמי:
+
+    check_update.sh
+
+* הפקודה תחזיר קוד 0 אם העדכון הצליח, או 1 אם לא היו עדכונים או שהייתה שגיאה.
+
 ## הגדרות
 
 יש לעדכן את הפרמטרים הבאים בקובץ `check_updates.py`:
 
-    REPO_OWNER = "imanuel300"        # שם המשתמש או הארגון בגיטהאב
-    REPO_NAME = "demo-project"      # שם המאגר
-    DEPLOY_PATH = "/var/www/demo-project"  # נתיב התיקייה בה יותקנו הקבצים
+    REPO_OWNER = "imanuel300"        # שם המשתמש ו הארגון בגיטהאב
+    REPO_NAME = "TranslateDocs"      # שם המאגר
+    DEPLOY_PATH = "/var/www/html/bedrock-translate"  # נתיב התיקייה בה יותקנו הקבצים
     CHECK_INTERVAL = 300            # תדירות הבדיקה בשניות (300 = 5 דקות)
 
 ### הגדרות למאגר פרטי
-
 אם המאגר הוא פרטי, יש ליצור Personal Access Token ב-GitHub:
 1. לך ל-Settings -> Developer settings -> Personal access tokens
 2. צור token חדש עם הרשאות `repo`
@@ -54,13 +72,13 @@
 
     GITHUB_TOKEN = "your-github-token"  # הכנס כאן את ה-token שיצרת
 
-## בדיקת סטטוס
+## בפייה בלוגים
 
-לבדיקת סטטוס השירות:
+לצפייה בלוגים של השירות:
 
-    sudo systemctl status update_checker
+    sudo tail -f /var/log/update_checker.log
 
-לצפייה בלוגים:
+או דרך journalctl:
 
     sudo journalctl -u update_checker -f
 
@@ -69,23 +87,20 @@
 1. אם השירות לא מתחיל:
    - בדוק הרשאות בתיקיות
    - וודא שכל החבילות מותקנות
-   - בדוק את הלוגים עם הפקודה `journalctl`
+   - בדוק את הלוגים
 
 2. אם העדכונים לא מתקבלים:
    - בדוק את הגדרות המאגר ב-GitHub
    - וודא שיש גישה לאינטרנט
    - בדוק שהנתיבים נכונים
 
+3. אם יש בעיות הרשאה:
+   - וודא שהמשתמש www-data יכול להריץ את הפקודות הנדרשות
+   - בדוק את הרשאות התיקיות והקבצים
+
 ## אבטחה
 
 - הקוד רץ תחת משתמש www-data
 - אין צורך בפתיחת פורטים
 - הקוד משתמש ב-API הציבורי של GitHub
-- מומלץ להגביל הרשאות בתיקיית היעד
-
-## תמיכה
-
-במקרה של בעיות או שאלות, ניתן:
-1. לבדוק את הלוגים של המערכת
-2. לבדוק את קובץ ה-state (`last_commit.json`)
-3. להריץ את הסקריפט באופן ידני לבדיקה 
+- מומלץ להגביל הרשאות בתיקיית היעד 
