@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import requests
 import zipfile
 import os
@@ -14,7 +16,7 @@ REPO_OWNER = "imanuel300"
 REPO_NAME = "TranslateDocs"
 DEPLOY_PATH = "/var/www/html/bedrock-translate"
 CHECK_INTERVAL = 300  # בדיקה כל 5 דקות
-STATE_FILE = "last_commit.json"
+STATE_FILE = "/var/www/html/CornGetFromGit/last_commit.json"
 GITHUB_TOKEN = "" 
 
 def get_latest_commit():
@@ -28,8 +30,21 @@ def get_latest_commit():
 
 def save_state(commit_sha):
     """שומר את מזהה הקומיט האחרון"""
-    with open(STATE_FILE, 'w') as f:
-        json.dump({'last_commit': commit_sha}, f)
+    try:
+        # יצירת התיקייה אם היא לא קיימת
+        os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        
+        # שמירת המצב
+        with open(STATE_FILE, 'w') as f:
+            json.dump({'last_commit': commit_sha}, f)
+        
+        # הגדרת הרשאות לקובץ
+        os.system(f"sudo -n chown www-data:www-data {STATE_FILE}")
+        os.system(f"sudo -n chmod 644 {STATE_FILE}")
+        
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] עודכן קובץ המצב: {commit_sha}")
+    except Exception as e:
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה בשמירת המצב: {str(e)}")
 
 def load_state():
     """טוען את מזהה הקומיט האחרון"""
@@ -96,15 +111,23 @@ def run_single_check():
     """פונקציה שמבצעת בדיקה אחת ומסתיימת"""
     try:
         current_commit = get_latest_commit()
+        if not current_commit:
+            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] לא הצלחתי לקבל את הקומיט האחרון")
+            return False
+            
         last_known_commit = load_state()
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] קומיט נוכחי: {current_commit}, קומיט אחרון ידוע: {last_known_commit}")
         
-        if current_commit and current_commit != last_known_commit:
+        if current_commit != last_known_commit:
             print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] נמצא עדכון חדש")
             if deploy_latest_version():
                 save_state(current_commit)
                 return True
         else:
             print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] אין עדכונים חדשים")
+            # עדכון הקובץ גם אם אין שינויים (למקרה שהקובץ לא קיים)
+            if not last_known_commit:
+                save_state(current_commit)
         return False
     except Exception as e:
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה: {str(e)}")

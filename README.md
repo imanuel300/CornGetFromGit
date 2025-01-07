@@ -32,8 +32,14 @@
 
 ### 4. הגדרת הרשאות
 
+    # הגדרת הרשאות לקבצי המערכת
     sudo chown www-data:www-data /var/www/html/CornGetFromGit/check_updates.py
     sudo chmod 755 /var/www/html/CornGetFromGit/check_updates.py
+    
+    # יצירת קובץ המצב והגדרת הרשאות
+    sudo touch /var/www/html/CornGetFromGit/last_commit.json
+    sudo chown www-data:www-data /var/www/html/CornGetFromGit/last_commit.json
+    sudo chmod 644 /var/www/html/CornGetFromGit/last_commit.json
 
 ### 5. הפעלת השירות
 
