@@ -8,8 +8,6 @@ WorkingDirectory=/var/www/html/CornGetFromGit
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 ExecStart=/usr/bin/python3 /var/www/html/CornGetFromGit/check_updates.py
 Restart=always
-StandardOutput=append:/var/log/update_checker.log
-StandardError=append:/var/log/update_checker.log
 
 [Install]
 WantedBy=multi-user.target 

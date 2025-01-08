@@ -45,7 +45,7 @@
 
     sudo systemctl daemon-reload
     sudo systemctl enable update_checker
-    sudo systemctl start update_checker
+    sudo systemctl restart update_checker
 
 ## שימוש
 
