@@ -7,6 +7,7 @@ import time
 import json
 import urllib3
 import sys
+import subprocess
 
 # התעלמות מאזהרות SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -41,13 +42,18 @@ def log_message(message, command_output=None):
 def run_command(command):
     """מריץ פקודה ומחזיר את התוצאה והקוד"""
     try:
-        output = os.popen(command).read()
-        return_code = os.system(command)
-        log_message(f"הרצת פקודה: {command}", f"Return code: {return_code}\nOutput:\n{output}")
+        # שימוש ב-subprocess במקום os.system לקבלת פלט מפורט יותר
+        process = subprocess.run(command, shell=True, capture_output=True, text=True)
+        output = process.stdout + process.stderr
+        return_code = process.returncode
+        
+        log_message(f"הרצת פקודה: {command}", 
+                   f"Return code: {return_code}\nOutput:\n{output}")
         return return_code, output
     except Exception as e:
-        log_message(f"שגיאה בהרצת פקודה {command}: {str(e)}")
-        return -1, str(e)
+        error_msg = f"שגיאה בהרצת פקודה {command}: {str(e)}"
+        log_message(error_msg)
+        return -1, error_msg
 
 def get_latest_commit():
     """מקבל את המזהה של הקומיט האחרון"""
@@ -177,7 +183,30 @@ def run_single_check():
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה: {str(e)}")
         return False
 
+def check_permissions():
+    """בודק ומתקן הרשאות לקבצי המערכת"""
+    try:
+        # יצירת תיקיות וקבצים אם לא קיימים
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        if not os.path.exists(LOG_FILE):
+            open(LOG_FILE, 'a').close()
+        if not os.path.exists(STATE_FILE):
+            open(STATE_FILE, 'a').close()
+            
+        # הגדרת הרשאות
+        run_command(f"sudo -n chown www-data:www-data {LOG_FILE}")
+        run_command(f"sudo -n chmod 664 {LOG_FILE}")
+        run_command(f"sudo -n chown www-data:www-data {STATE_FILE}")
+        run_command(f"sudo -n chmod 664 {STATE_FILE}")
+        return True
+    except Exception as e:
+        print(f"שגיאה בהגדרת הרשאות: {str(e)}")
+        return False
+
 def main():
+    if not check_permissions():
+        print("שגיאה: לא ניתן להגדיר הרשאות נדרשות")
+        return False
     # בדיקה האם הקוד הורץ במצב בדיקה חד פעמית
     if len(sys.argv) > 1 and sys.argv[1] == "--single":
         return run_single_check()

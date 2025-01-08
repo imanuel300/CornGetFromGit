@@ -33,15 +33,24 @@
 ### 4. הגדרת הרשאות
 
     # הגדרת הרשאות לקבצי המערכת
+    sudo mkdir -p /var/www/html/CornGetFromGit
+    sudo chown -R www-data:www-data /var/www/html/CornGetFromGit
+    sudo chmod -R 755 /var/www/html/CornGetFromGit
+    
+    # יצירת קבצי לוג והרשאות
+    sudo touch /var/www/html/CornGetFromGit/update_process.log
+    sudo touch /var/www/html/CornGetFromGit/last_commit.json
+    sudo chown www-data:www-data /var/www/html/CornGetFromGit/update_process.log
+    sudo chown www-data:www-data /var/www/html/CornGetFromGit/last_commit.json
+    sudo chmod 664 /var/www/html/CornGetFromGit/update_process.log
+    sudo chmod 664 /var/www/html/CornGetFromGit/last_commit.json
+    
+    # הגדרת הרשאות לסקריפט
+    sudo cp check_updates.py /var/www/html/CornGetFromGit/
     sudo chown www-data:www-data /var/www/html/CornGetFromGit/check_updates.py
     sudo chmod 755 /var/www/html/CornGetFromGit/check_updates.py
-    
-    # יצירת קובץ המצב והגדרת הרשאות
-    sudo touch /var/www/html/CornGetFromGit/last_commit.json
-    sudo chown www-data:www-data /var/www/html/CornGetFromGit/last_commit.json
-    sudo chmod 644 /var/www/html/CornGetFromGit/last_commit.json
 
-### 5. הפעלת השירות
+### 5. הפעלת השרות
 
     sudo systemctl daemon-reload
     sudo systemctl enable update_checker
