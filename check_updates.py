@@ -18,6 +18,36 @@ DEPLOY_PATH = "/var/www/html/bedrock-translate"
 CHECK_INTERVAL = 300  # בדיקה כל 5 דקות
 STATE_FILE = "/var/www/html/CornGetFromGit/last_commit.json"
 GITHUB_TOKEN = "" 
+LOG_FILE = "/var/www/html/CornGetFromGit/update_process.log"
+
+def log_message(message, command_output=None):
+    """כותב הודעה לקובץ לוג ולמסך"""
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+    log_entry = f"[{timestamp}] {message}"
+    
+    # הדפסה למסך
+    print(log_entry)
+    
+    try:
+        # כתיבה לקובץ
+        with open(LOG_FILE, 'a') as f:
+            f.write(log_entry + "\n")
+            if command_output:
+                f.write(f"Command output:\n{command_output}\n")
+                f.write("-" * 50 + "\n")
+    except Exception as e:
+        print(f"[{timestamp}] שגיאה בכתיבה לקובץ לוג: {str(e)}")
+
+def run_command(command):
+    """מריץ פקודה ומחזיר את התוצאה והקוד"""
+    try:
+        output = os.popen(command).read()
+        return_code = os.system(command)
+        log_message(f"הרצת פקודה: {command}", f"Return code: {return_code}\nOutput:\n{output}")
+        return return_code, output
+    except Exception as e:
+        log_message(f"שגיאה בהרצת פקודה {command}: {str(e)}")
+        return -1, str(e)
 
 def get_latest_commit():
     """מקבל את המזהה של הקומיט האחרון"""
@@ -57,66 +87,68 @@ def load_state():
 def deploy_latest_version():
     """מוריד ופורס את הגרסה האחרונה"""
     try:
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] מתחיל תהליך התקנה...")
+        log_message("מתחיל תהליך התקנה...")
         
         zip_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/main.zip"
         headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
         response = requests.get(zip_url, headers=headers, verify=False)
         
         if response.status_code == 200:
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] הורדת הקבצים הצליחה")
+            log_message("הורדת הקבצים הצליחה")
             
             # שמירת הקובץ ZIP
             zip_path = '/tmp/repo.zip'
             with open(zip_path, 'wb') as f:
                 f.write(response.content)
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] קובץ ZIP נשמר ב-{zip_path}")
+            log_message(f"קובץ ZIP נשמר ב-{zip_path}")
             
             # פריסת הקבצים
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall('/tmp')
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] קבצים חולצו בהצלחה")
+            log_message("קבצים חולצו בהצלחה")
                 
             # העברת הקבצים למיקום הסופי
             extracted_dir = f"/tmp/{REPO_NAME}-main"
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] מעתיק קבצים ל-{DEPLOY_PATH}")
-            os.system(f"sudo -n /bin/rm -rf {DEPLOY_PATH}/*")
-            os.system(f"sudo -n /bin/mv {extracted_dir}/* {DEPLOY_PATH}/")
+            log_message(f"מעתיק קבצים ל-{DEPLOY_PATH}")
+            run_command(f"sudo -n /bin/rm -rf {DEPLOY_PATH}/*")
+            run_command(f"sudo -n /bin/mv {extracted_dir}/* {DEPLOY_PATH}/")
             
             # ניקוי קבצים זמניים
             os.remove(zip_path)
-            os.system(f"sudo -n /bin/rm -rf {extracted_dir}")
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] קבצים זמניים נוקו")
+            run_command(f"sudo -n /bin/rm -rf {extracted_dir}")
+            log_message("קבצים זמניים נוקו")
             
             # שינוי הרשאות והרצת setup.sh
             current_dir = os.getcwd()
             os.chdir(DEPLOY_PATH)
             
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] מגדיר הרשאות הרצה ל-setup.sh")
-            setup_result = os.system("sudo -n chmod +x setup.sh")
-            if setup_result == 0:
-                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] הרשאות הוגדרו בהצלחה")
+            log_message("מגדיר הרשאות הרצה ל-setup.sh")
+            setup_code, setup_output = run_command("sudo -n chmod +x setup.sh")
+            if setup_code == 0:
+                log_message("הרשאות הוגדרו בהצלחה")
             else:
-                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה בהגדרת הרשאות: {setup_result}")
+                log_message(f"שגיאה בהגדרת הרשאות: {setup_code}")
             
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] מריץ את setup.sh")
-            install_result = os.system("./setup.sh production")
-            if install_result == 0:
-                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] setup.sh הסתיים בהצלחה")
+            log_message("מריץ את setup.sh")
+            install_code, install_output = run_command("sudo -n ./setup.sh production")
+            if install_code == 0:
+                log_message("setup.sh הסתיים בהצלחה")
             else:
-                print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה בהרצת setup.sh: {install_result}")
+                log_message(f"שגיאה בהרצת setup.sh: {install_code}")
+                if install_code == 256:
+                    log_message("שגיאת הרשאות - הסקריפט דורש הרשאות sudo")
             
-            os.system(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
+            run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
             os.chdir(current_dir)
             
-            print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] התקנה הושלמה בהצלחה")
+            log_message("התקנה הושלמה בהצלחה")
             return True
         
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה בהורדת הקבצים: {response.status_code}")
+        log_message(f"שגיאה בהורדת הקבצים: {response.status_code}")
         return False
         
     except Exception as e:
-        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] שגיאה בתהליך ההתקנה: {str(e)}")
+        log_message(f"שגיאה בתהליך ההתקנה: {str(e)}")
         return False
 
 def run_single_check():
