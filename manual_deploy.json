@@ -1,0 +1,9 @@
+{
+    "repo_owner": "imanuel300",
+    "repo_name": "TranslateDocs",
+    "deploy_path": "/var/www/html/bedrock-translate",
+    "github_token": "",
+    "branch": "main",
+    "setup_script": "setup.sh",
+    "setup_args": "production"
+} 

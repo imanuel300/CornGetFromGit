@@ -1,121 +1,128 @@
 # מערכת עדכון אוטומטית מ-GitHub
 
-מערכת זו מאפשרת עדכון אוטומטי של קבצי פרויקט מ-GitHub לשרת Linux. המערכת בכולה לפעול הן כשירות רקע והן בהפעלה ידנית חד פעמית.
+מערכת זו מאפשרת עדכון אוטומטי של קבצים מ-GitHub למערכת הפעלה. המערכת תומכת בשני מצבי עבודה:
+1. עדכון אוטומטי - בדיקת עדכונים כל 10 דקות
+2. עדכון ידני - על ידי הוספת קובץ הגדרות לתיקיית `pending`
 
-## דרישות מערכת
-- Python 3.6 ומעלה
-- pip
-- systemd
-- הרשאות www-data
+## מבנה המערכת
 
-## התקנה 
+```
+CornGetFromGit/
+├── pending/           # תיקייה לקבצי הגדרות חדשים
+├── processed/         # תיקייה לקבצי הגדרות שעובדו
+├── check_updates.py   # הסקריפט הראשי
+├── update_process.log # קובץ לוג
+└── last_commit.json   # מעקב אחר קומיטים
+```
 
-### 1. התקנת חבילות Python הנדרשות
+## קובץ הגדרות
 
-    pip3 install requests urllib3
+יש ליצור קובץ JSON עם ההגדרות הבאות:
 
-### 2. הגדרת תיקיות ומיקומים
+```json
+{
+    "repo_owner": "username",      # שם המשתמש ב-GitHub
+    "repo_name": "repository",     # שם המאגר
+    "deploy_path": "/path/to/dir", # נתיב התקנה
+    "github_token": "",            # (אופציונלי) טוקן GitHub
+    "branch": "main",             # (אופציונלי) ענף ברירת מחדל
+    "setup_script": "setup.sh",    # (אופציונלי) סקריפט התקנה
+    "setup_args": "production"     # (אופציונלי) פרמטרים להתקנה
+}
+```
 
-    # יצירת תיקיית היעד לפרויקט אם לא קיימת
-    sudo mkdir -p /var/www/html/CornGetFromGit
-    sudo chown www-data:www-data /var/www/html/CornGetFromGit
+## התקנה
 
-### 3. העתקת קבצים
+1. העתק את הקבצים לתיקיית `/var/www/html/CornGetFromGit`
+2. הרץ את סקריפט ההתקנה:
+```bash
+sudo chmod +x install.sh
+sudo ./install.sh
 
-    # העתקת קבצי המערכת
-    sudo cp check_updates.py /var/www/html/CornGetFromGit/
-    sudo cp update_checker.service /etc/systemd/system/
+# התקנת שירות
+sudo cp update_checker.service /etc/systemd/system/
+# טעינת שירות
+sudo systemctl daemon-reload
 
-    # העתקת סקריפט ההפעלה הידנית
-    sudo cp check_update.sh /usr/local/bin/
-    sudo chmod +x /usr/local/bin/check_update.sh
+# בדיקת הרשאות
+sudo systemctl stop update_checker
+sudo chown -R www-data:www-data /var/www/html/CornGetFromGit
+sudo chmod -R 775 /var/www/html/CornGetFromGit
+sudo systemctl start update_checker
+```
 
-### 4. הגדרת הרשאות
-
-    # הגדרת הרשאות לקבצי המערכת
-    sudo mkdir -p /var/www/html/CornGetFromGit
-    sudo chown -R www-data:www-data /var/www/html/CornGetFromGit
-    sudo chmod -R 755 /var/www/html/CornGetFromGit
-    
-    # יצירת קבצי לוג והרשאות
-    sudo touch /var/www/html/CornGetFromGit/update_process.log
-    sudo touch /var/www/html/CornGetFromGit/last_commit.json
-    sudo chown www-data:www-data /var/www/html/CornGetFromGit/update_process.log
-    sudo chown www-data:www-data /var/www/html/CornGetFromGit/last_commit.json
-    sudo chmod 664 /var/www/html/CornGetFromGit/update_process.log
-    sudo chmod 664 /var/www/html/CornGetFromGit/last_commit.json
-    
-    # הגדרת הרשאות לסקריפט
-    sudo cp check_updates.py /var/www/html/CornGetFromGit/
-    sudo chown www-data:www-data /var/www/html/CornGetFromGit/check_updates.py
-    sudo chmod 755 /var/www/html/CornGetFromGit/check_updates.py
-
-### 5. הפעלת השרות
-
-    sudo systemctl daemon-reload
-    sudo systemctl enable update_checker
-    sudo systemctl restart update_checker
 
 ## שימוש
 
-### הפעלה אוטומטית
-השירות רץ ברקע ובודק עדכונים כל 5 דקות. ניתן לבדוק את סטטוס השירות:
+### עדכון אוטומטי
+1. צור קובץ הגדרות (לדוגמה: `auto_check.json`)
+2. העתק את הקובץ לתיקיית `processed`
+3. המערכת תבדוק עדכונים אוטומטית כל 10 דקות
 
-    sudo systemctl status update_checker
+### עדכון ידני
+1. צור קובץ הגדרות (לדוגמה: `manual_deploy.json`)
+2. העתק את הקובץ לתיקיית `pending`
+3. המערכת תזהה את הקובץ מיד ותתחיל בתהליך העדכון
 
-### הפעלה ידנית
-לבדיקת עדכונים באופן חד פעמי:
+## מעקב אחר עדכונים
 
-    check_update.sh
+- הלוגים נשמרים ב-`update_process.log`
+- קבצי ההגדרות המעובדים ב-`processed` מכילים היסטוריית עדכונים
+- ניתן לראות את סטטוס השירות:
+```bash
+sudo systemctl status update_checker
+```
 
-* הפקודה תחזיר קוד 0 אם העדכון הצליח, או 1 אם לא היו עדכונים או שהייתה שגיאה.
+## פקודות שימושיות
 
-## הגדרות
+```bash
+# הפעלת השירות
+sudo systemctl start update_checker
 
-יש לעדכן את הפרמטרים הבאים בקובץ `check_updates.py`:
+# עצירת השירות
+sudo systemctl stop update_checker
 
-    REPO_OWNER = "imanuel300"        # שם המשתמש ו הארגון בגיטהאב
-    REPO_NAME = "TranslateDocs"      # שם המאגר
-    DEPLOY_PATH = "/var/www/html/bedrock-translate"  # נתיב התיקייה בה יותקנו הקבצים
-    CHECK_INTERVAL = 300            # תדירות הבדיקה בשניות (300 = 5 דקות)
+# הפעלה מחדש
+sudo systemctl restart update_checker
 
-### הגדרות למאגר פרטי
-אם המאגר הוא פרטי, יש ליצור Personal Access Token ב-GitHub:
-1. לך ל-Settings -> Developer settings -> Personal access tokens
-2. צור token חדש עם הרשאות `repo`
-3. העתק את ה-token והוסף אותו לקובץ:
+# צפייה בלוגים
+tail -f /var/www/html/CornGetFromGit/update_process.log
 
-    GITHUB_TOKEN = "your-github-token"  # הכנס כאן את ה-token שיצרת
+# בדיקה ידנית
+sudo -u www-data /usr/bin/python3 /var/www/html/CornGetFromGit/check_updates.py --single
 
-## בפייה בלוגים
+# בדיקת סטטוס השירות
+systemctl | grep update_checker
 
-לצפייה בלוגים של השירות:
+```
 
-    sudo tail -f /var/log/update_checker.log
+## הרשאות
 
-או דרך journalctl:
-
-    sudo journalctl -u update_checker -f
+המערכת רצה תחת המשתמש `www-data` ודורשת הרשאות מתאימות:
+- קריאה/כתיבה לתיקיות `pending` ו-`processed`
+- הרשאות הרצה לסקריפט `check_updates.py`
+- הרשאות כתיבה לקובץ הלוג
 
 ## פתרון בעיות
 
-1. אם השירות לא מתחיל:
-   - בדוק הרשאות בתיקיות
-   - וודא שכל החבילות מותקנות
-   - בדוק את הלוגים
+1. בדוק את הלוגים:
+```bash
+tail -f /var/www/html/CornGetFromGit/update_process.log
+```
 
-2. אם העדכונים לא מתקבלים:
-   - בדוק את הגדרות המאגר ב-GitHub
-   - וודא שיש גישה לאינטרנט
-   - בדוק שהנתיבים נכונים
+2. וודא הרשאות:
+```bash
+ls -la /var/www/html/CornGetFromGit/
+```
 
-3. אם יש בעיות הרשאה:
-   - וודא שהמשתמש www-data יכול להריץ את הפקודות הנדרשות
-   - בדוק את הרשאות התיקיות והקבצים
+3. בדוק סטטוס שירות:
+```bash
+sudo systemctl status update_checker
+```
 
-## אבטחה
-
-- הקוד רץ תחת משתמש www-data
-- אין צורך בפתיחת פורטים
-- הקוד משתמש ב-API הציבורי של GitHub
-- מומלץ להגביל הרשאות בתיקיית היעד 
+4. אפס את המערכת:
+```bash
+sudo systemctl stop update_checker
+sudo rm -f /var/www/html/CornGetFromGit/check_updates.lock
+sudo systemctl start update_checker
+```

@@ -1,0 +1,21 @@
+{
+    "repo_owner": "imanuel300",
+    "repo_name": "TranslateDocs",
+    "deploy_path": "/var/www/html/bedrock-translate",
+    "github_token": "",
+    "branch": "main",
+    "setup_script": "setup.sh",
+    "setup_args": "production",
+    "last_commit": "68c949063236d789d62f848a32ce6af67c265a5a",
+    "last_update": "2024-02-04 17:54:48",
+    "status": "success",
+    "update_log": "אין צורך בעדכון - הגרסה העדכנית כבר מותקנת",
+    "history": [
+        {
+            "commit": "68c949063236d789d62f848a32ce6af67c265a5a",
+            "update_time": "2024-02-04 17:54:27",
+            "status": "success",
+            "log": "התקנה הושלמה בהצלחה"
+        }
+    ]
+} 

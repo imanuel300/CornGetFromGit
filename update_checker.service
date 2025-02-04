@@ -1,13 +1,19 @@
 [Unit]
-Description=GitHub Update Checker
+Description=GitHub Auto Update Service
 After=network.target
 
 [Service]
+Type=simple
 User=www-data
+Group=www-data
 WorkingDirectory=/var/www/html/CornGetFromGit
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 ExecStart=/usr/bin/python3 /var/www/html/CornGetFromGit/check_updates.py
-Restart=always
+Restart=on-failure
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=3
+KillMode=process
+TimeoutStopSec=5
 
 [Install]
 WantedBy=multi-user.target 
