@@ -5,5 +5,6 @@
     "github_token": "",
     "branch": "main",
     "setup_script": "setup.sh",
-    "setup_args": "production"
+    "setup_args": "production",
+    "update_only_changed_files": true
 } 

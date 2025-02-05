@@ -32,6 +32,7 @@ REPO_OWNER = None
 REPO_NAME = None
 DEPLOY_PATH = None
 GITHUB_TOKEN = ""
+UPDATE_ONLY_CHANGED_FILES = False
 
 class ConfigFileHandler(FileSystemEventHandler):
     """מטפל באירועים של קבצים חדשים בתיקיית pending"""
@@ -149,10 +150,19 @@ def deploy_latest_version():
         
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall('/tmp')
+        
+        if UPDATE_ONLY_CHANGED_FILES:
+            # קבלת רשימת הקבצים ששונו בקומיט האחרון
+            changed_files = get_changed_files(get_latest_commit())
             
-        # העברה למיקום הסופי
-        run_command(f"sudo -n rm -rf {DEPLOY_PATH}/*")
-        run_command(f"sudo -n mv {extracted_dir}/* {DEPLOY_PATH}/")
+            # העברה למיקום הסופי רק של הקבצים ששונו
+            for file in changed_files:
+                run_command(f"sudo -n mv {extracted_dir}/{file} {DEPLOY_PATH}/{file}")
+        else:
+            # העברה של כל הקבצים
+            run_command(f"sudo -n rm -rf {DEPLOY_PATH}/*")
+            run_command(f"sudo -n mv {extracted_dir}/* {DEPLOY_PATH}/")
+        
         run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
         
         # הרצת setup.sh אם קיים
@@ -179,7 +189,7 @@ def deploy_latest_version():
 
 def load_config(config_file):
     """טוען הגדרות מקובץ"""
-    global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN
+    global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN, UPDATE_ONLY_CHANGED_FILES
     try:
         with open(config_file, 'r') as f:
             config = json.load(f)
@@ -187,6 +197,7 @@ def load_config(config_file):
             REPO_NAME = config['repo_name']
             DEPLOY_PATH = config['deploy_path']
             GITHUB_TOKEN = config.get('github_token', '')
+            UPDATE_ONLY_CHANGED_FILES = config.get('update_only_changed_files', False)
             return True
     except Exception as e:
         log_message(f"שגיאה בטעינת הגדרות מ-{config_file}: {str(e)}")
@@ -297,6 +308,7 @@ def process_config_file(config_file_path):
         # בדיקת תקינות ההגדרות
         if not validate_config(config):
             log_message(f"קובץ {config_file_path} מכיל הגדרות לא תקינות")
+            os.remove(config_file_path)  # מחיקת הקובץ
             return False
         
         # הכנת הקובץ החדש
@@ -345,28 +357,36 @@ def process_config_file(config_file_path):
             config['history'] = history[-9:]  # שמירת 10 עדכונים אחרונים
             config['history'].append(update_info)
             
-            # כתיבת התוכן לקובץ החדש
-            with open(processed_file, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=4, ensure_ascii=False)
-            
-            # מחיקת הקובץ המקורי אם הכל בסדר
+            # כתיבת התוכן לקובץ החדש אם ההתקנה הצליחה
             if success:
-                try:
-                    os.remove(config_file_path)
-                    log_message(f"קובץ {config_file_path} הועבר בהצלחה ל-processed")
-                except Exception as e:
-                    log_message(f"שגיאה במחיקת קובץ המקור: {str(e)}")
+                with open(processed_file, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=4, ensure_ascii=False)
+                log_message(f"קובץ {config_file_path} הועבר בהצלחה ל-processed")
             else:
-                log_message(f"התקנה נכשלה, קובץ {config_file_path} נשאר ב-pending")
+                log_message(f"התקנה נכשלה עבור {config_file_path}")
+            
+            # מחיקת הקובץ המקורי בכל מקרה
+            try:
+                os.remove(config_file_path)
+            except Exception as e:
+                log_message(f"שגיאה במחיקת קובץ המקור: {str(e)}")
             
             return success
             
         except Exception as e:
             log_message(f"שגיאה בעיבוד קובץ: {str(e)}")
+            try:
+                os.remove(config_file_path)  # מחיקת הקובץ גם במקרה של שגיאה
+            except:
+                pass
             return False
             
     except Exception as e:
         log_message(f"שגיאה בעיבוד קובץ הגדרות {config_file_path}: {str(e)}")
+        try:
+            os.remove(config_file_path)  # מחיקת הקובץ גם במקרה של שגיאה
+        except:
+            pass
         return False
 
 def check_processed_configs():
@@ -507,6 +527,38 @@ def validate_directories():
     except Exception as e:
         log_message(f"שגיאה בבדיקת תיקיות: {str(e)}")
         return False
+
+def get_changed_files(commit_sha):
+    """מקבל רשימת קבצים ששונו בקומיט מסוים"""
+    try:
+        # קבלת מידע על הקומיט
+        api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/commits/{commit_sha}"
+        headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
+        
+        response = requests.get(api_url, headers=headers, verify=False)
+        if response.status_code != 200:
+            log_message(f"שגיאה בקבלת מידע על קומיט: {response.status_code}")
+            return []
+            
+        commit_data = response.json()
+        changed_files = []
+        
+        # איסוף רשימת הקבצים ששונו
+        for file in commit_data.get('files', []):
+            file_path = file.get('filename')
+            if file_path:
+                # יצירת תיקיות נדרשות
+                dir_path = os.path.dirname(os.path.join(DEPLOY_PATH, file_path))
+                if not os.path.exists(dir_path):
+                    os.makedirs(dir_path, exist_ok=True)
+                changed_files.append(file_path)
+        
+        log_message(f"נמצאו {len(changed_files)} קבצים ששונו בקומיט {commit_sha}")
+        return changed_files
+        
+    except Exception as e:
+        log_message(f"שגיאה בקבלת רשימת קבצים ששונו: {str(e)}")
+        return []
 
 def main():
     # ניסיון לקבל נעילה (כולל בדיקת תהליכים כפולים)
