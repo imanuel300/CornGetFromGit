@@ -37,15 +37,24 @@ UPDATE_ONLY_CHANGED_FILES = False
 class ConfigFileHandler(FileSystemEventHandler):
     """מטפל באירועים של קבצים חדשים בתיקיית pending"""
     
+    def __init__(self):
+        self.processing = set()  # מעקב אחר קבצים בעיבוד
+    
     def on_created(self, event):
         if not event.is_directory and event.src_path.endswith('.json'):
-            log_message(f"זוהה קובץ הגדרות חדש: {event.src_path}")
-            process_config_file(event.src_path)
+            if event.src_path not in self.processing:
+                self.processing.add(event.src_path)
+                log_message(f"זוהה קובץ הגדרות חדש: {event.src_path}")
+                process_config_file(event.src_path)
+                self.processing.remove(event.src_path)
     
     def on_modified(self, event):
         if not event.is_directory and event.src_path.endswith('.json'):
-            log_message(f"זוהה עדכון בקובץ הגדרות: {event.src_path}")
-            process_config_file(event.src_path)
+            if event.src_path not in self.processing and os.path.exists(event.src_path):
+                self.processing.add(event.src_path)
+                log_message(f"זוהה עדכון בקובץ הגדרות: {event.src_path}")
+                process_config_file(event.src_path)
+                self.processing.remove(event.src_path)
 
 def log_message(message, command_output=None):
     """כותב הודעה לקובץ לוג ולמסך"""
@@ -395,7 +404,7 @@ def check_processed_configs():
         log_message("מתחיל בדיקת עדכונים בתיקיית processed...")
         
         if not os.path.exists(CONFIG_PROCESSED_DIR):
-            log_message("תיקיית processed לא קיימת")
+            log_message("תיקיית processed לא קיימת") 
             return
             
         files = [f for f in os.listdir(CONFIG_PROCESSED_DIR) if f.endswith('.json')]
