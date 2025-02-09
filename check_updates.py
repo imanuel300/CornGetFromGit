@@ -24,7 +24,6 @@ LOG_FILE = f"{BASE_DIR}/update_process.log"
 STATE_FILE = f"{BASE_DIR}/last_commit.json"
 
 # מרווחי זמן לבדיקות
-MANUAL_CHECK_INTERVAL = 20  # בדיקת קבצי הגדרות כל 20 שניות
 AUTO_CHECK_INTERVAL = 600   # בדיקת GitHub כל 10 דקות
 
 # הגדרות ברירת מחדל
@@ -33,6 +32,7 @@ REPO_NAME = None
 DEPLOY_PATH = None
 GITHUB_TOKEN = ""
 UPDATE_ONLY_CHANGED_FILES = False
+BRANCH = 'main'  # ברירת מחדל
 
 class ConfigFileHandler(FileSystemEventHandler):
     """מטפל באירועים של קבצים חדשים בתיקיית pending"""
@@ -92,7 +92,7 @@ def run_command(command):
 
 def get_latest_commit():
     """מקבל את המזהה של הקומיט האחרון"""
-    api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/commits/main"
+    api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/commits/{BRANCH}"  # שימוש בענף הנבחר
     headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
     response = requests.get(api_url, headers=headers, verify=False)
     if response.status_code == 200:
@@ -138,52 +138,53 @@ def load_state():
 
 def deploy_latest_version():
     """מוריד ופורס את הגרסה האחרונה"""
-    zip_path = '/tmp/repo.zip'
-    extracted_dir = f"/tmp/{REPO_NAME}-main"
-    
     try:
         log_message("מתחיל תהליך התקנה...")
         
-        # הורדת הקבצים
-        zip_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/main.zip"
+        # שינוי כתובת ה-ZIP להשתמש בענף הנכון
+        zip_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/{BRANCH}.zip"
         headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
         response = requests.get(zip_url, headers=headers, verify=False)
         
-        if response.status_code != 200:
-            log_message(f"שגיאה בהורדת הקבצים: {response.status_code}")
-            return False
+        if response.status_code == 200:
+            log_message("הורדת הקבצים הצליחה")
             
-        # שמירה וחילוץ
-        with open(zip_path, 'wb') as f:
-            f.write(response.content)
-        
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall('/tmp')
-        
-        if UPDATE_ONLY_CHANGED_FILES:
-            # קבלת רשימת הקבצים ששונו בקומיט האחרון
-            changed_files = get_changed_files(get_latest_commit())
+            # שמירת הקובץ ZIP
+            zip_path = '/tmp/repo.zip'
+            with open(zip_path, 'wb') as f:
+                f.write(response.content)
+            log_message(f"קובץ ZIP נשמר ב-{zip_path}")
             
-            # העברה למיקום הסופי רק של הקבצים ששונו
-            for file in changed_files:
-                run_command(f"sudo -n mv {extracted_dir}/{file} {DEPLOY_PATH}/{file}")
-        else:
-            # העברה של כל הקבצים
-            run_command(f"sudo -n rm -rf {DEPLOY_PATH}/*")
-            run_command(f"sudo -n mv {extracted_dir}/* {DEPLOY_PATH}/")
-        
-        run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
-        
-        # הרצת setup.sh אם קיים
-        if os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
-            current_dir = os.getcwd()
-            os.chdir(DEPLOY_PATH)
-            run_command("sudo -n chmod +x setup.sh")
-            run_command("sudo -n ./setup.sh production")
-            os.chdir(current_dir)
+            # פריסת הקבצים - שים לב לשינוי בשם התיקייה
+            extracted_dir = f"/tmp/{REPO_NAME}-{BRANCH}"  # שינוי שם התיקייה לפי הענף
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall('/tmp')
+            log_message("קבצים חולצו בהצלחה")
             
-        log_message("התקנה הושלמה בהצלחה")
-        return True
+            if UPDATE_ONLY_CHANGED_FILES:
+                # קבלת רשימת הקבצים ששונו בקומיט האחרון
+                changed_files = get_changed_files(get_latest_commit())
+                
+                # העברה למיקום הסופי רק של הקבצים ששונו
+                for file in changed_files:
+                    run_command(f"sudo -n mv {extracted_dir}/{file} {DEPLOY_PATH}/{file}")
+            else:
+                # העברה של כל הקבצים
+                run_command(f"sudo -n rm -rf {DEPLOY_PATH}/*")
+                run_command(f"sudo -n mv {extracted_dir}/* {DEPLOY_PATH}/")
+            
+            run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
+            
+            # הרצת setup.sh אם קיים
+            if os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
+                current_dir = os.getcwd()
+                os.chdir(DEPLOY_PATH)
+                run_command("sudo -n chmod +x setup.sh")
+                run_command("sudo -n ./setup.sh production")
+                os.chdir(current_dir)
+            
+            log_message("התקנה הושלמה בהצלחה")
+            return True
         
     except Exception as e:
         log_message(f"שגיאה בתהליך ההתקנה: {str(e)}")
@@ -198,7 +199,7 @@ def deploy_latest_version():
 
 def load_config(config_file):
     """טוען הגדרות מקובץ"""
-    global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN, UPDATE_ONLY_CHANGED_FILES
+    global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN, UPDATE_ONLY_CHANGED_FILES, BRANCH
     try:
         with open(config_file, 'r') as f:
             config = json.load(f)
@@ -207,6 +208,7 @@ def load_config(config_file):
             DEPLOY_PATH = config['deploy_path']
             GITHUB_TOKEN = config.get('github_token', '')
             UPDATE_ONLY_CHANGED_FILES = config.get('update_only_changed_files', False)
+            BRANCH = config.get('branch', 'main')  # קריאת הענף מההגדרות
             return True
     except Exception as e:
         log_message(f"שגיאה בטעינת הגדרות מ-{config_file}: {str(e)}")
