@@ -340,24 +340,6 @@ def process_config_file(config_file_path):
         processed_file = os.path.join(CONFIG_PROCESSED_DIR, 
                                     os.path.basename(config_file_path))
         
-        # טעינת היסטוריה אם קיימת
-        history = []
-        if os.path.exists(processed_file):
-            try:
-                with open(processed_file, 'r') as f:
-                    old_config = json.load(f)
-                    if 'history' in old_config:
-                        history = old_config['history']
-                    if 'last_update' in old_config:
-                        history.append({
-                            'commit': old_config.get('last_commit'),
-                            'update_time': old_config['last_update'],
-                            'status': old_config.get('status'),
-                            'log': old_config.get('update_log')
-                        })
-            except Exception as e:
-                log_message(f"שגיאה בטעינת היסטוריה: {str(e)}")
-        
         try:
             # ביצוע ההתקנה
             success = run_single_check(config_file_path)
@@ -379,8 +361,6 @@ def process_config_file(config_file_path):
             
             # עדכון הקונפיג עם המידע החדש
             config.update(update_info)
-            config['history'] = history[-9:]  # שמירת 10 עדכונים אחרונים
-            config['history'].append(update_info)
             
             # כתיבת התוכן לקובץ החדש אם ההתקנה הצליחה
             if success:
