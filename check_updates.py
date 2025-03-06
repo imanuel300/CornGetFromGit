@@ -185,7 +185,7 @@ def deploy_latest_version():
                 # הרצה ישירה של setup.sh עם לוגים
                 log_message("מריץ את setup.sh")
                 # שימוש ב-os.popen כדי לקבל את הפלט
-                process = os.popen("./setup.sh production 2>&1")
+                process = os.popen("sudo -n ./setup.sh production 2>&1")
                 output = process.read()
                 install_result = process.close()
                 
