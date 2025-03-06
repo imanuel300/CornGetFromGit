@@ -181,20 +181,73 @@ def deploy_latest_version():
             if os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
                 current_dir = os.getcwd()
                 os.chdir(DEPLOY_PATH)
-                run_command("sudo -n chmod +x setup.sh")
-                # הרצה ישירה של setup.sh עם לוגים
-                log_message("מריץ את setup.sh")
-                # שימוש ב-os.popen כדי לקבל את הפלט
-                process = os.popen("sudo -n ./setup.sh production 2>&1")
-                output = process.read()
-                install_result = process.close()
+                run_command("chmod +x setup.sh")
                 
-                if install_result is None:  # הצלחה
-                    log_message("setup.sh הסתיים בהצלחה")
-                else:
-                    error_code = install_result >> 8  # המרה לקוד שגיאה אמיתי
-                    log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {error_code}")
-                    log_message(f"פלט הסקריפט:\n{output}")
+                log_message("קורא את תוכן setup.sh")
+                try:
+                    with open("setup.sh", 'r') as f:
+                        setup_content = f.read()
+                    
+                    # מפצל את הקובץ לפקודות נפרדות, מתעלם מהערות ושורות ריקות
+                    commands = []
+                    current_command = []
+                    in_heredoc = False
+                    heredoc_marker = None
+                    
+                    for line in setup_content.split('\n'):
+                        line = line.strip()
+                        
+                        # דילוג על שורות ריקות והערות
+                        if not line or (not in_heredoc and line.startswith('#')):
+                            continue
+                            
+                        # טיפול ב-heredoc (למשל EOF)
+                        if '<<' in line and not in_heredoc:
+                            in_heredoc = True
+                            heredoc_marker = line.split('<<')[1].strip().strip("'").strip('"')
+                            current_command.append(line)
+                            continue
+                            
+                        if in_heredoc:
+                            current_command.append(line)
+                            if line == heredoc_marker:
+                                in_heredoc = False
+                                commands.append('\n'.join(current_command))
+                                current_command = []
+                            continue
+                            
+                        # טיפול בפקודות רגילות
+                        if line.endswith('\\'):  # פקודה ממשיכה בשורה הבאה
+                            current_command.append(line[:-1])
+                        else:
+                            current_command.append(line)
+                            if current_command:
+                                commands.append(' '.join(current_command))
+                            current_command = []
+                    
+                    log_message(f"מריץ {len(commands)} פקודות מתוך setup.sh:")
+                    success = True
+                    
+                    # מריץ כל פקודה בנפרד
+                    for cmd in commands:
+                        log_message(f"מריץ פקודה:\n{cmd}")
+                        return_code, output = run_command(f"sudo -n {cmd}")
+                        if return_code != 0:
+                            log_message(f"שגיאה בהרצת הפקודה. קוד שגיאה: {return_code}")
+                            log_message(f"פלט:\n{output}")
+                            success = False
+                            break
+                        else:
+                            log_message(f"הפקודה הושלמה בהצלחה. פלט:\n{output}")
+                    
+                    if success:
+                        log_message("setup.sh הסתיים בהצלחה")
+                    else:
+                        log_message("setup.sh נכשל")
+                        
+                except Exception as e:
+                    log_message(f"שגיאה בקריאה או הרצה של setup.sh: {str(e)}")
+                    
                 os.chdir(current_dir)
             
             log_message("התקנה הושלמה בהצלחה")
