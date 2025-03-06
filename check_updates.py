@@ -77,8 +77,10 @@ def log_message(message, command_output=None):
 def run_command(command):
     """מריץ פקודה ומחזיר את התוצאה והקוד"""
     try:
-        # שימוש ב-subprocess במקום os.system לקבלת פלט מפורט יותר
-        process = subprocess.run(command, shell=True, capture_output=True, text=True)
+        # הרצת הפקודה דרך /bin/bash כדי לשמור על הגדרות ה-sudo
+        process = subprocess.run(['/bin/bash', '-c', command], 
+                               capture_output=True, 
+                               text=True)
         output = process.stdout + process.stderr
         return_code = process.returncode
         
@@ -180,7 +182,19 @@ def deploy_latest_version():
                 current_dir = os.getcwd()
                 os.chdir(DEPLOY_PATH)
                 run_command("sudo -n chmod +x setup.sh")
-                run_command("sudo -n ./setup.sh production")
+                # הרצה ישירה של setup.sh עם לוגים
+                log_message("מריץ את setup.sh")
+                # שימוש ב-os.popen כדי לקבל את הפלט
+                process = os.popen("./setup.sh production 2>&1")
+                output = process.read()
+                install_result = process.close()
+                
+                if install_result is None:  # הצלחה
+                    log_message("setup.sh הסתיים בהצלחה")
+                else:
+                    error_code = install_result >> 8  # המרה לקוד שגיאה אמיתי
+                    log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {error_code}")
+                    log_message(f"פלט הסקריפט:\n{output}")
                 os.chdir(current_dir)
             
             log_message("התקנה הושלמה בהצלחה")
@@ -403,7 +417,7 @@ def process_config_file(config_file_path):
 def check_processed_configs():
     """בדיקת עדכונים לקבצי הגדרות מעובדים"""
     try:
-        log_message("מתחיל בדיקת עדכונים בתיקיית processed...")
+        log_message("מתחיל בדיקה תקופתית...")
         
         if not os.path.exists(CONFIG_PROCESSED_DIR):
             log_message("תיקיית processed לא קיימת") 
@@ -433,9 +447,10 @@ def check_processed_configs():
                 
                 # בדיקת עדכונים
                 current_commit = get_latest_commit()
-                last_known_commit = config.get('last_commit')
+                # קריאת הקומיט האחרון מקובץ המצב הגלובלי
+                last_known_commit = load_state()
                 
-                log_message(f"קומיט נוכחי: {current_commit}, קומיט אחרון: {last_known_commit}")
+                log_message(f"קומיט נוכחי: {current_commit}, קומיט אחרון ידוע: {last_known_commit}")
                 
                 if not current_commit:
                     log_message(f"לא הצלחתי לקבל את הקומיט האחרון עבור {file}")
@@ -444,6 +459,8 @@ def check_processed_configs():
                 if current_commit != last_known_commit:
                     log_message(f"נמצא עדכון חדש עבור {file}")
                     if deploy_latest_version():
+                        # עדכון הקומיט האחרון בשני המקומות
+                        save_state(current_commit)
                         config['last_commit'] = current_commit
                         config['last_update'] = time.strftime('%Y-%m-%d %H:%M:%S')
                         config['status'] = 'success'
