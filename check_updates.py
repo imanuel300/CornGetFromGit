@@ -188,6 +188,9 @@ def deploy_latest_version():
                     with open("setup.sh", 'r') as f:
                         setup_content = f.read()
                     
+                    # רשימת פקודות שדורשות sudo
+                    sudo_commands = ['apt-get', 'chown', 'chmod', 'systemctl', 'cp', 'ln', 'mkdir']
+                    
                     # מפצל את הקובץ לפקודות נפרדות, מתעלם מהערות ושורות ריקות
                     commands = []
                     current_command = []
@@ -231,7 +234,14 @@ def deploy_latest_version():
                     # מריץ כל פקודה בנפרד
                     for cmd in commands:
                         log_message(f"מריץ פקודה:\n{cmd}")
-                        return_code, output = run_command(f"sudo -n {cmd}")
+                        
+                        # בדיקה האם הפקודה צריכה sudo
+                        needs_sudo = any(cmd.strip().startswith(sudo_cmd) for sudo_cmd in sudo_commands)
+                        
+                        if needs_sudo:
+                            cmd = f"sudo -n {cmd}"
+                            
+                        return_code, output = run_command(cmd)
                         if return_code != 0:
                             log_message(f"שגיאה בהרצת הפקודה. קוד שגיאה: {return_code}")
                             log_message(f"פלט:\n{output}")
