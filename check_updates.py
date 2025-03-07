@@ -8,7 +8,6 @@ import json
 import urllib3
 import sys
 import subprocess
-import fcntl
 import errno
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -66,8 +65,8 @@ def log_message(message, command_output=None):
     print(log_entry)
     
     try:
-        # כתיבה לקובץ
-        with open(LOG_FILE, 'a') as f:
+        # כתיבה לקובץ עם קידוד utf-8
+        with open(LOG_FILE, 'a', encoding='utf-8') as f:
             f.write(log_entry + "\n")
             if command_output:
                 f.write(f"Command output:\n{command_output}\n")
@@ -345,7 +344,8 @@ def process_config_file(config_file_path):
         # בדיקת תקינות ההגדרות
         if not validate_config(config):
             log_message(f"קובץ {config_file_path} מכיל הגדרות לא תקינות")
-            os.remove(config_file_path)  # מחיקת הקובץ
+            if os.path.exists(config_file_path):
+                os.remove(config_file_path)  # מחיקת הקובץ
             return False
         
         # הכנת הקובץ החדש
@@ -383,40 +383,54 @@ def process_config_file(config_file_path):
                 log_message(f"התקנה נכשלה עבור {config_file_path}")
             
             # מחיקת הקובץ המקורי בכל מקרה
-            try:
-                os.remove(config_file_path)
-            except Exception as e:
-                log_message(f"שגיאה במחיקת קובץ המקור: {str(e)}")
+            if os.path.exists(config_file_path):
+                try:
+                    os.remove(config_file_path)
+                except Exception as e:
+                    log_message(f"שגיאה במחיקת קובץ המקור: {str(e)}")
             
             return success
             
         except Exception as e:
             log_message(f"שגיאה בעיבוד קובץ: {str(e)}")
-            try:
-                os.remove(config_file_path)  # מחיקת הקובץ גם במקרה של שגיאה
-            except:
-                pass
+            if os.path.exists(config_file_path):
+                try:
+                    os.remove(config_file_path)  # מחיקת הקובץ גם במקרה של שגיאה
+                except:
+                    pass
             return False
             
     except Exception as e:
         log_message(f"שגיאה בעיבוד קובץ הגדרות {config_file_path}: {str(e)}")
-        try:
-            os.remove(config_file_path)  # מחיקת הקובץ גם במקרה של שגיאה
-        except:
-            pass
+        if os.path.exists(config_file_path):
+            try:
+                os.remove(config_file_path)  # מחיקת הקובץ גם במקרה של שגיאה
+            except:
+                pass
         return False
 
 def check_processed_configs():
     """בדיקת עדכונים לקבצי הגדרות מעובדים"""
     try:
         # בדיקה אם יש תהליך התקנה פעיל
-        try:
-            output = subprocess.check_output(['pgrep', '-f', 'setup.sh']).decode()
-            if output.strip():
-                log_message("זוהה תהליך התקנה פעיל, דילוג על בדיקת עדכונים")
+        if os.name == 'nt':  # Windows
+            try:
+                import psutil
+                for proc in psutil.process_iter(['pid', 'name']):
+                    if 'setup.sh' in proc.info['name'] or 'check_updates.py' in proc.info['name']:
+                        log_message(f"יש תהליך התקנה פעיל (PID: {proc.info['pid']})")
+                        return
+            except ImportError:
+                log_message("psutil לא מותקן, לא ניתן לבדוק תהליכים פעילים")
                 return
-        except subprocess.CalledProcessError:
-            pass  # אין תהליך התקנה פעיל
+        else:  # Linux/Unix
+            try:
+                output = subprocess.check_output(['pgrep', '-f', 'setup.sh|check_updates.py']).decode()
+                if output.strip():
+                    log_message("זוהה תהליך התקנה פעיל, דילוג על בדיקת עדכונים")
+                    return
+            except subprocess.CalledProcessError:
+                pass  # אין תהליך התקנה פעיל
         
         log_message("מתחיל בדיקה תקופתית...")
         
@@ -486,44 +500,77 @@ def check_processed_configs():
 def acquire_lock():
     """מנסה לקבל נעילה על הסקריפט"""
     lock_file = os.path.join(BASE_DIR, 'check_updates.lock')
+    
+    # ייבוא מותנה לפי מערכת ההפעלה
+    if os.name == 'nt':
+        import msvcrt
+    else:
+        import fcntl
+
     try:
         # בדיקת תהליכים קיימים
-        try:
-            output = subprocess.check_output(['pgrep', '-f', 'setup.sh|check_updates.py']).decode()
-            pids = output.strip().split('\n')
-            current_pid = str(os.getpid())
-            other_pids = [pid for pid in pids if pid != current_pid]
-            
-            if other_pids:
-                log_message(f"יש תהליך התקנה פעיל (PIDs: {', '.join(other_pids)})")
+        if os.name == 'nt':  # Windows
+            try:
+                if os.path.exists(lock_file):
+                    with open(lock_file, 'r') as f:
+                        lock_data = json.load(f)
+                        # בדיקה אם התהליך עדיין רץ
+                        pid = lock_data.get('pid')
+                        if pid:
+                            try:
+                                import psutil
+                                if psutil.pid_exists(pid):
+                                    log_message(f"יש תהליך התקנה פעיל (PID: {pid})")
+                                    return None
+                            except ImportError:
+                                # אם psutil לא מותקן, נבדוק לפי זמן
+                                if time.time() - os.path.getmtime(lock_file) < 3600:  # שעה אחת
+                                    return None
+                    # אם הגענו לכאן, הקובץ ישן או לא תקין
+                    os.remove(lock_file)
+            except Exception:
+                pass
+
+            # יצירת קובץ נעילה חדש
+            try:
+                fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except OSError as e:
+                if e.errno == errno.EEXIST:
+                    return None
+                raise
+            f = os.fdopen(fd, 'w')
+        else:  # Linux/Unix
+            # בדיקת תהליכים קיימים
+            try:
+                output = subprocess.check_output(['pgrep', '-f', 'setup.sh|check_updates.py']).decode()
+                pids = output.strip().split('\n')
+                current_pid = str(os.getpid())
+                other_pids = [pid for pid in pids if pid != current_pid]
+                
+                if other_pids:
+                    log_message(f"יש תהליך התקנה פעיל (PIDs: {', '.join(other_pids)})")
+                    return None
+            except subprocess.CalledProcessError:
+                pass
+
+            f = open(lock_file, 'w')
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except IOError:
+                f.close()
                 return None
-        except subprocess.CalledProcessError:
-            pass  # אין תהליכים אחרים
-            
-        # בדיקה אם קובץ הנעילה קיים וישן
-        if os.path.exists(lock_file):
-            if time.time() - os.path.getmtime(lock_file) > 3600:  # שעה אחת
-                os.remove(lock_file)
-                log_message("נמחק קובץ נעילה ישן")
-            else:
-                log_message("קובץ נעילה קיים ותקף")
-                return None
-        
-        # יצירת קובץ נעילה חדש
-        lock_fd = open(lock_file, 'w')
-        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        
-        # כתיבת PID ומידע נוסף לקובץ
+
+        # כתיבת מידע לקובץ הנעילה
         info = {
             'pid': os.getpid(),
             'start_time': time.strftime('%Y-%m-%d %H:%M:%S'),
             'user': getpass.getuser()
         }
-        json.dump(info, lock_fd)
-        lock_fd.flush()
+        json.dump(info, f)
+        f.flush()
         
         log_message(f"נעילה הושגה בהצלחה (PID: {os.getpid()})")
-        return lock_fd
+        return f
         
     except Exception as e:
         log_message(f"שגיאה בנעילת הקובץ: {str(e)}")
@@ -533,12 +580,19 @@ def release_lock(lock_fd):
     """משחרר את הנעילה"""
     try:
         if lock_fd:
-            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
-            lock_fd.close()
-            # מחיקת קובץ הנעילה
-            lock_file = os.path.join(BASE_DIR, 'check_updates.lock')
-            if os.path.exists(lock_file):
-                os.remove(lock_file)
+            if os.name == 'nt':  # Windows
+                lock_fd.close()
+                try:
+                    os.remove(os.path.join(BASE_DIR, 'check_updates.lock'))
+                except:
+                    pass
+            else:  # Linux/Unix
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+                lock_fd.close()
+                try:
+                    os.remove(os.path.join(BASE_DIR, 'check_updates.lock'))
+                except:
+                    pass
     except Exception as e:
         log_message(f"שגיאה בשחרור הנעילה: {str(e)}")
 
@@ -546,7 +600,7 @@ def validate_directories():
     """בדיקת תקינות התיקיות"""
     try:
         # וידוא שהתיקיות קיימות
-        for dir_path in [CONFIG_WATCH_DIR, CONFIG_PROCESSED_DIR]:
+        for dir_path in [BASE_DIR, CONFIG_WATCH_DIR, CONFIG_PROCESSED_DIR, os.path.dirname(LOG_FILE), os.path.dirname(STATE_FILE)]:
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
                 log_message(f"נוצרה תיקייה: {dir_path}")
@@ -589,8 +643,7 @@ def get_changed_files(commit_sha):
                     os.makedirs(dir_path, exist_ok=True)
                 changed_files.append(file_path)
         
-        log_message(f"נמצאו {len(changed_files)} קבצים ששונו בקומיט ")
-         log_message(f"{commit_sha}")
+        log_message(f"נמצאו {len(changed_files)} קבצים ששונו בקומיט {commit_sha}")
         return changed_files
         
     except Exception as e:
@@ -598,6 +651,11 @@ def get_changed_files(commit_sha):
         return []
 
 def main():
+    # בדיקת תקינות התיקיות לפני כל פעולה
+    if not validate_directories():
+        print("שגיאה: לא ניתן לוודא תקינות תיקיות")
+        return False
+
     # ניסיון לקבל נעילה (כולל בדיקת תהליכים כפולים)
     lock_fd = acquire_lock()
     if not lock_fd:
@@ -606,11 +664,6 @@ def main():
     try:
         if not check_permissions():
             print("שגיאה: לא ניתן להגדיר הרשאות נדרשות")
-            return False
-            
-        # בדיקת תקינות התיקיות
-        if not validate_directories():
-            print("שגיאה: לא ניתן לוודא תקינות תיקיות")
             return False
 
         if len(sys.argv) > 1 and sys.argv[1] == "--single":
