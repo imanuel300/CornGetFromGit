@@ -12,6 +12,7 @@ import fcntl
 import errno
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import getpass
 
 # התעלמות מאזהרות SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -24,7 +25,7 @@ LOG_FILE = f"{BASE_DIR}/update_process.log"
 STATE_FILE = f"{BASE_DIR}/last_commit.json"
 
 # מרווחי זמן לבדיקות
-AUTO_CHECK_INTERVAL = 600   # בדיקת GitHub כל 10 דקות
+AUTO_CHECK_INTERVAL = 1200   # בדיקת GitHub כל 20 דקות
 
 # הגדרות ברירת מחדל
 REPO_OWNER = None
@@ -183,80 +184,23 @@ def deploy_latest_version():
                 os.chdir(DEPLOY_PATH)
                 run_command("chmod +x setup.sh")
                 
-                log_message("קורא את תוכן setup.sh")
+                log_message("מריץ את setup.sh")
                 try:
-                    with open("setup.sh", 'r') as f:
-                        setup_content = f.read()
+                    # הרצת הסקריפט עם sudo
+                    process = os.popen(f"sudo -n {DEPLOY_PATH}/setup.sh production 2>&1")
+                    output = process.read()
+                    install_result = process.close()
                     
-                    # רשימת פקודות שדורשות sudo
-                    sudo_commands = ['apt-get', 'chown', 'chmod', 'systemctl', 'cp', 'ln', 'mkdir']
-                    
-                    # מפצל את הקובץ לפקודות נפרדות, מתעלם מהערות ושורות ריקות
-                    commands = []
-                    current_command = []
-                    in_heredoc = False
-                    heredoc_marker = None
-                    
-                    for line in setup_content.split('\n'):
-                        line = line.strip()
-                        
-                        # דילוג על שורות ריקות והערות
-                        if not line or (not in_heredoc and line.startswith('#')):
-                            continue
-                            
-                        # טיפול ב-heredoc (למשל EOF)
-                        if '<<' in line and not in_heredoc:
-                            in_heredoc = True
-                            heredoc_marker = line.split('<<')[1].strip().strip("'").strip('"')
-                            current_command.append(line)
-                            continue
-                            
-                        if in_heredoc:
-                            current_command.append(line)
-                            if line == heredoc_marker:
-                                in_heredoc = False
-                                commands.append('\n'.join(current_command))
-                                current_command = []
-                            continue
-                            
-                        # טיפול בפקודות רגילות
-                        if line.endswith('\\'):  # פקודה ממשיכה בשורה הבאה
-                            current_command.append(line[:-1])
-                        else:
-                            current_command.append(line)
-                            if current_command:
-                                commands.append(' '.join(current_command))
-                            current_command = []
-                    
-                    log_message(f"מריץ {len(commands)} פקודות מתוך setup.sh:")
-                    success = True
-                    
-                    # מריץ כל פקודה בנפרד
-                    for cmd in commands:
-                        log_message(f"מריץ פקודה:\n{cmd}")
-                        
-                        # בדיקה האם הפקודה צריכה sudo
-                        needs_sudo = any(cmd.strip().startswith(sudo_cmd) for sudo_cmd in sudo_commands)
-                        
-                        if needs_sudo:
-                            cmd = f"sudo -n {cmd}"
-                            
-                        return_code, output = run_command(cmd)
-                        if return_code != 0:
-                            log_message(f"שגיאה בהרצת הפקודה. קוד שגיאה: {return_code}")
-                            log_message(f"פלט:\n{output}")
-                            success = False
-                            break
-                        else:
-                            log_message(f"הפקודה הושלמה בהצלחה. פלט:\n{output}")
-                    
-                    if success:
+                    if install_result is None:  # הצלחה
                         log_message("setup.sh הסתיים בהצלחה")
+                        log_message(f"פלט:\n{output}")
                     else:
-                        log_message("setup.sh נכשל")
+                        error_code = install_result >> 8 if install_result else 1
+                        log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {error_code}")
+                        log_message(f"פלט:\n{output}")
                         
                 except Exception as e:
-                    log_message(f"שגיאה בקריאה או הרצה של setup.sh: {str(e)}")
+                    log_message(f"שגיאה בהרצת setup.sh: {str(e)}")
                     
                 os.chdir(current_dir)
             
@@ -460,6 +404,15 @@ def process_config_file(config_file_path):
 def check_processed_configs():
     """בדיקת עדכונים לקבצי הגדרות מעובדים"""
     try:
+        # בדיקה אם יש תהליך התקנה פעיל
+        try:
+            output = subprocess.check_output(['pgrep', '-f', 'setup.sh']).decode()
+            if output.strip():
+                log_message("זוהה תהליך התקנה פעיל, דילוג על בדיקת עדכונים")
+                return
+        except subprocess.CalledProcessError:
+            pass  # אין תהליך התקנה פעיל
+        
         log_message("מתחיל בדיקה תקופתית...")
         
         if not os.path.exists(CONFIG_PROCESSED_DIR):
@@ -528,20 +481,20 @@ def acquire_lock():
     try:
         # בדיקת תהליכים קיימים
         try:
-            output = subprocess.check_output(['pgrep', '-f', 'check_updates.py']).decode()
+            output = subprocess.check_output(['pgrep', '-f', 'setup.sh|check_updates.py']).decode()
             pids = output.strip().split('\n')
             current_pid = str(os.getpid())
             other_pids = [pid for pid in pids if pid != current_pid]
             
             if other_pids:
-                log_message(f"הסקריפט כבר רץ (PIDs: {', '.join(other_pids)})")
+                log_message(f"יש תהליך התקנה פעיל (PIDs: {', '.join(other_pids)})")
                 return None
         except subprocess.CalledProcessError:
             pass  # אין תהליכים אחרים
             
         # בדיקה אם קובץ הנעילה קיים וישן
         if os.path.exists(lock_file):
-            if time.time() - os.path.getmtime(lock_file) > 300:  # 5 דקות
+            if time.time() - os.path.getmtime(lock_file) > 3600:  # שעה אחת
                 os.remove(lock_file)
                 log_message("נמחק קובץ נעילה ישן")
             else:
@@ -552,12 +505,16 @@ def acquire_lock():
         lock_fd = open(lock_file, 'w')
         fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         
-        # כתיבת PID לקובץ
-        pid = str(os.getpid())
-        lock_fd.write(pid)
+        # כתיבת PID ומידע נוסף לקובץ
+        info = {
+            'pid': os.getpid(),
+            'start_time': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'user': getpass.getuser()
+        }
+        json.dump(info, lock_fd)
         lock_fd.flush()
         
-        log_message(f"נעילה הושגה בהצלחה (PID: {pid})")
+        log_message(f"נעילה הושגה בהצלחה (PID: {os.getpid()})")
         return lock_fd
         
     except Exception as e:
@@ -681,4 +638,6 @@ def main():
         release_lock(lock_fd)
 
 if __name__ == '__main__':
+    current_user = getpass.getuser()
+    log_message(f"הסקריפט רץ תחת המשתמש: {current_user}")
     sys.exit(0 if main() else 1) 
