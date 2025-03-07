@@ -143,6 +143,7 @@ def deploy_latest_version():
     """מוריד ופורס את הגרסה האחרונה"""
     try:
         log_message("מתחיל תהליך התקנה...")
+        current_commit = get_latest_commit()  # שמירת הקומיט הנוכחי
         
         # שינוי כתובת ה-ZIP להשתמש בענף הנכון
         zip_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/{BRANCH}.zip"
@@ -166,7 +167,7 @@ def deploy_latest_version():
             
             if UPDATE_ONLY_CHANGED_FILES:
                 # קבלת רשימת הקבצים ששונו בקומיט האחרון
-                changed_files = get_changed_files(get_latest_commit())
+                changed_files = get_changed_files(current_commit)
                 
                 # העברה למיקום הסופי רק של הקבצים ששונו
                 for file in changed_files:
@@ -179,6 +180,7 @@ def deploy_latest_version():
             run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
             
             # הרצת setup.sh אם קיים
+            setup_success = True  # דגל להצלחת setup.sh
             if os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
                 current_dir = os.getcwd()
                 os.chdir(DEPLOY_PATH)
@@ -186,7 +188,6 @@ def deploy_latest_version():
                 
                 log_message("מריץ את setup.sh")
                 try:
-                    # הרצת הסקריפט עם sudo
                     process = os.popen(f"sudo -n {DEPLOY_PATH}/setup.sh production 2>&1")
                     output = process.read()
                     install_result = process.close()
@@ -198,14 +199,18 @@ def deploy_latest_version():
                         error_code = install_result >> 8 if install_result else 1
                         log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {error_code}")
                         log_message(f"פלט:\n{output}")
+                        setup_success = False
                         
                 except Exception as e:
                     log_message(f"שגיאה בהרצת setup.sh: {str(e)}")
+                    setup_success = False
                     
                 os.chdir(current_dir)
             
-            log_message("התקנה הושלמה בהצלחה")
-            return True
+            # עדכון הקומיט האחרון בכל מקרה, גם אם setup.sh נכשל
+            save_state(current_commit)
+            log_message("התקנה הושלמה" + (" בהצלחה" if setup_success else " עם שגיאות ב-setup.sh"))
+            return True  # מחזירים True גם אם setup.sh נכשל
         
     except Exception as e:
         log_message(f"שגיאה בתהליך ההתקנה: {str(e)}")
@@ -443,8 +448,7 @@ def check_processed_configs():
                 
                 # בדיקת עדכונים
                 current_commit = get_latest_commit()
-                # קריאת הקומיט האחרון מקובץ המצב הגלובלי
-                last_known_commit = load_state()
+                last_known_commit = load_state()  # קריאת הקומיט האחרון מקובץ המצב
                 
                 log_message(f"קומיט נוכחי: {current_commit}, קומיט אחרון ידוע: {last_known_commit}")
                 
@@ -456,15 +460,19 @@ def check_processed_configs():
                     log_message(f"נמצא עדכון חדש עבור {file}")
                     if deploy_latest_version():
                         # עדכון הקומיט האחרון בשני המקומות
-                        save_state(current_commit)
+                        save_state(current_commit)  # שמירה בקובץ המצב הגלובלי
+                        
+                        # עדכון בקובץ ההגדרות
                         config['last_commit'] = current_commit
                         config['last_update'] = time.strftime('%Y-%m-%d %H:%M:%S')
                         config['status'] = 'success'
                         config['update_log'] = "התקנה הושלמה בהצלחה"
                         
-                        with open(config_path, 'w') as f:
+                        # שמירת הקובץ המעודכן
+                        with open(config_path, 'w', encoding='utf-8') as f:
                             json.dump(config, f, indent=4, ensure_ascii=False)
-                        log_message(f"עודכן קובץ {file}")
+                            
+                        log_message(f"עודכן קובץ {file} וקובץ המצב הגלובלי")
                 else:
                     log_message(f"אין עדכונים חדשים עבור {file}")
                     
@@ -581,7 +589,8 @@ def get_changed_files(commit_sha):
                     os.makedirs(dir_path, exist_ok=True)
                 changed_files.append(file_path)
         
-        log_message(f"נמצאו {len(changed_files)} קבצים ששונו בקומיט {commit_sha}")
+        log_message(f"נמצאו {len(changed_files)} קבצים ששונו בקומיט ")
+         log_message(f"{commit_sha}")
         return changed_files
         
     except Exception as e:
