@@ -182,10 +182,8 @@ def deploy_latest_version():
             # הרצת setup.sh אם קיים ואם הוגדר להריץ אותו
             setup_success = True  # דגל להצלחת setup.sh
             
-            # בדיקה האם להריץ את קובץ setup.sh
-            run_setup = config.get('run_setup_script', False)
-            
-            if run_setup and os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
+            # בדיקה האם להריץ את קובץ setup.sh - משתמש במשתנה הגלובלי RUN_SETUP_SCRIPT
+            if RUN_SETUP_SCRIPT and os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
                 current_dir = os.getcwd()
                 os.chdir(DEPLOY_PATH)
                 run_command("chmod +x setup.sh")
@@ -211,7 +209,7 @@ def deploy_latest_version():
                     
                 os.chdir(current_dir)
             else:
-                if not run_setup:
+                if not RUN_SETUP_SCRIPT:
                     log_message("דילוג על הרצת setup.sh לפי הגדרות המשתמש")
                 elif not os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
                     log_message("קובץ setup.sh לא נמצא")
