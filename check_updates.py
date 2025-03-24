@@ -33,6 +33,7 @@ DEPLOY_PATH = None
 GITHUB_TOKEN = ""
 UPDATE_ONLY_CHANGED_FILES = False
 BRANCH = 'main'  # ברירת מחדל
+RUN_SETUP_SCRIPT = False  # ברירת מחדל להרצת setup.sh
 
 class ConfigFileHandler(FileSystemEventHandler):
     """מטפל באירועים של קבצים חדשים בתיקיית pending"""
@@ -178,9 +179,13 @@ def deploy_latest_version():
             
             run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
             
-            # הרצת setup.sh אם קיים
+            # הרצת setup.sh אם קיים ואם הוגדר להריץ אותו
             setup_success = True  # דגל להצלחת setup.sh
-            if os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
+            
+            # בדיקה האם להריץ את קובץ setup.sh
+            run_setup = config.get('run_setup_script', False)
+            
+            if run_setup and os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
                 current_dir = os.getcwd()
                 os.chdir(DEPLOY_PATH)
                 run_command("chmod +x setup.sh")
@@ -205,6 +210,11 @@ def deploy_latest_version():
                     setup_success = False
                     
                 os.chdir(current_dir)
+            else:
+                if not run_setup:
+                    log_message("דילוג על הרצת setup.sh לפי הגדרות המשתמש")
+                elif not os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
+                    log_message("קובץ setup.sh לא נמצא")
             
             # עדכון הקומיט האחרון בכל מקרה, גם אם setup.sh נכשל
             save_state(current_commit)
@@ -224,7 +234,7 @@ def deploy_latest_version():
 
 def load_config(config_file):
     """טוען הגדרות מקובץ"""
-    global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN, UPDATE_ONLY_CHANGED_FILES, BRANCH
+    global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN, UPDATE_ONLY_CHANGED_FILES, BRANCH, RUN_SETUP_SCRIPT
     try:
         with open(config_file, 'r') as f:
             config = json.load(f)
@@ -234,6 +244,7 @@ def load_config(config_file):
             GITHUB_TOKEN = config.get('github_token', '')
             UPDATE_ONLY_CHANGED_FILES = config.get('update_only_changed_files', False)
             BRANCH = config.get('branch', 'main')  # קריאת הענף מההגדרות
+            RUN_SETUP_SCRIPT = config.get('run_setup_script', False)  # קריאת הגדרת הרצת setup.sh
             return True
     except Exception as e:
         log_message(f"שגיאה בטעינת הגדרות מ-{config_file}: {str(e)}")
@@ -313,7 +324,8 @@ def validate_config(config):
         'github_token': '',
         'branch': 'main',
         'setup_script': 'setup.sh',
-        'setup_args': 'production'
+        'setup_args': 'production',
+        'run_setup_script': False  # הוספת שדה חדש עם ערך ברירת מחדל False
     }
     
     # בדיקת שדות חובה
@@ -454,11 +466,12 @@ def check_processed_configs():
                     config = json.load(f)
                     
                 # טעינת הגדרות גלובליות
-                global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN
+                global REPO_OWNER, REPO_NAME, DEPLOY_PATH, GITHUB_TOKEN, RUN_SETUP_SCRIPT
                 REPO_OWNER = config['repo_owner']
                 REPO_NAME = config['repo_name']
                 DEPLOY_PATH = config['deploy_path']
                 GITHUB_TOKEN = config.get('github_token', '')
+                RUN_SETUP_SCRIPT = config.get('run_setup_script', False)
                 
                 # בדיקת עדכונים
                 current_commit = get_latest_commit()
