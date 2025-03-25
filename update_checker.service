@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-User=www-data
+User=root
 Group=www-data
 WorkingDirectory=/var/www/html/CornGetFromGit
 ExecStart=/usr/bin/python3 /var/www/html/CornGetFromGit/check_updates.py
