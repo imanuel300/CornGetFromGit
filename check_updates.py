@@ -179,27 +179,31 @@ def deploy_latest_version():
             
             run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
             
-            # הרצת setup.sh אם קיים ואם הוגדר להריץ אותו
+            # הרצת setup.sh אם קיים
             setup_success = True  # דגל להצלחת setup.sh
             
-            # בדיקה האם להריץ את קובץ setup.sh - משתמש במשתנה הגלובלי RUN_SETUP_SCRIPT
-            if RUN_SETUP_SCRIPT and os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
+            if os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
                 current_dir = os.getcwd()
                 os.chdir(DEPLOY_PATH)
-                run_command("chmod +x setup.sh")
+                run_command("sudo chmod +x setup.sh")
                 
                 log_message("מריץ את setup.sh")
                 try:
-                    process = os.popen(f"sudo -n {DEPLOY_PATH}/setup.sh production 2>&1")
-                    output = process.read()
-                    install_result = process.close()
+                    if RUN_SETUP_SCRIPT:
+                        # הרצה עם פרמטר production
+                        process = os.popen(f"sudo -n {DEPLOY_PATH}/setup.sh production 2>&1")
+                        output = process.read()
+                        install_result = process.close()
+                    else:
+                        # הרצה ללא פרמטרים
+                        install_result = os.system("sudo -n ./setup.sh")
+                        output = "הרצה הושלמה" if install_result == 0 else f"נכשל עם קוד שגיאה: {install_result}"
                     
-                    if install_result is None:  # הצלחה
+                    if install_result == 0:  # הצלחה
                         log_message("setup.sh הסתיים בהצלחה")
                         log_message(f"פלט:\n{output}")
                     else:
-                        error_code = install_result >> 8 if install_result else 1
-                        log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {error_code}")
+                        log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {install_result}")
                         log_message(f"פלט:\n{output}")
                         setup_success = False
                         
@@ -209,10 +213,7 @@ def deploy_latest_version():
                     
                 os.chdir(current_dir)
             else:
-                if not RUN_SETUP_SCRIPT:
-                    log_message("דילוג על הרצת setup.sh לפי הגדרות המשתמש")
-                elif not os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
-                    log_message("קובץ setup.sh לא נמצא")
+                log_message("קובץ setup.sh לא נמצא")
             
             # עדכון הקומיט האחרון בכל מקרה, גם אם setup.sh נכשל
             save_state(current_commit)
