@@ -195,8 +195,8 @@ def deploy_latest_version():
                         output = process.read()
                         install_result = process.close()
                     else:
-                        # הרצה ללא פרמטרים - הסרנו את הדגל -n
-                        install_result = os.system("sudo ./setup.sh")
+                        # הרצה ללא פרמטרים - ללא sudo
+                        install_result = os.system("./setup.sh")
                         output = "הרצה הושלמה" if install_result == 0 else f"נכשל עם קוד שגיאה: {install_result}"
                     
                     if install_result == 0:  # הצלחה
