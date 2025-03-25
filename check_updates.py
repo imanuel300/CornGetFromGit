@@ -195,15 +195,16 @@ def deploy_latest_version():
                         output = process.read()
                         install_result = process.close()
                     else:
-                        # הרצה ללא פרמטרים
-                        install_result = os.system("sudo -n ./setup.sh")
+                        # הרצה ללא פרמטרים - הסרנו את הדגל -n
+                        install_result = os.system("sudo ./setup.sh")
                         output = "הרצה הושלמה" if install_result == 0 else f"נכשל עם קוד שגיאה: {install_result}"
                     
                     if install_result == 0:  # הצלחה
                         log_message("setup.sh הסתיים בהצלחה")
                         log_message(f"פלט:\n{output}")
                     else:
-                        log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {install_result}")
+                        error_code = install_result >> 8  # המרת קוד השגיאה לפורמט תקין
+                        log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {error_code}")
                         log_message(f"פלט:\n{output}")
                         setup_success = False
                         
