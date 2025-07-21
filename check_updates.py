@@ -31,7 +31,7 @@ REPO_OWNER = None
 REPO_NAME = None
 DEPLOY_PATH = None
 GITHUB_TOKEN = ""
-UPDATE_ONLY_CHANGED_FILES = False
+UPDATE_ONLY_CHANGED_FILES = True
 BRANCH = 'main'  # ברירת מחדל
 RUN_SETUP_SCRIPT = False  # ברירת מחדל להרצת setup.sh
 
@@ -139,94 +139,112 @@ def load_state():
         log_message(f"שגיאה בטעינת המצב: {str(e)}")
         return None
 
+def get_commits_between(base_commit, head_commit):
+    """מחזיר רשימת מזהי קומיטים מהישן לחדש (לא כולל base, כולל head)"""
+    try:
+        commits = []
+        page = 1
+        while True:
+            api_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/commits?sha={BRANCH}&since=&per_page=100&page={page}"
+            headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
+            response = requests.get(api_url, headers=headers, verify=False)
+            if response.status_code != 200:
+                log_message(f"שגיאה בקבלת רשימת קומיטים: {response.status_code}")
+                return []
+            data = response.json()
+            if not data:
+                break
+            for commit in data:
+                sha = commit['sha']
+                commits.append(sha)
+                if sha == base_commit:
+                    # עצרנו, base_commit נמצא
+                    return list(reversed(commits[:-1]))  # לא כולל base, מהישן לחדש
+            page += 1
+        return list(reversed(commits))
+    except Exception as e:
+        log_message(f"שגיאה בקבלת קומיטים בטווח: {str(e)}")
+        return []
+
 def deploy_latest_version():
-    """מוריד ופורס את הגרסה האחרונה"""
+    """מוריד ופורס את הגרסה האחרונה, ומעתיק רק קבצים ששונו בכל הקומיטים מהפעם האחרונה"""
     try:
         log_message("מתחיל תהליך התקנה...")
         current_commit = get_latest_commit()  # שמירת הקומיט הנוכחי
-        
+        last_known_commit = load_state()
         # שינוי כתובת ה-ZIP להשתמש בענף הנכון
         zip_url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/{BRANCH}.zip"
         headers = {'Authorization': f'token {GITHUB_TOKEN}'} if GITHUB_TOKEN else {}
         response = requests.get(zip_url, headers=headers, verify=False)
-        
         if response.status_code == 200:
             log_message("הורדת הקבצים הצליחה")
-            
-            # שמירת הקובץ ZIP
             zip_path = '/tmp/repo.zip'
             with open(zip_path, 'wb') as f:
                 f.write(response.content)
             log_message(f"קובץ ZIP נשמר ב-{zip_path}")
-            
-            # פריסת הקבצים - שים לב לשינוי בשם התיקייה
-            extracted_dir = f"/tmp/{REPO_NAME}-{BRANCH}"  # שינוי שם התיקייה לפי הענף
+            extracted_dir = f"/tmp/{REPO_NAME}-{BRANCH}"
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall('/tmp')
             log_message("קבצים חולצו בהצלחה")
-            
-            if UPDATE_ONLY_CHANGED_FILES:
-                # קבלת רשימת הקבצים ששונו בקומיט האחרון
-                changed_files = get_changed_files(current_commit)
-                
-                # העברה למיקום הסופי רק של הקבצים ששונו
+            if UPDATE_ONLY_CHANGED_FILES and last_known_commit:
+                # אם יש שינוי, ניקח את כל הקבצים מכל הקומיטים בטווח; אם אין שינוי, רק את הקומיט האחרון
+                if current_commit != last_known_commit:
+                    commits = get_commits_between(last_known_commit, current_commit)
+                    commits.append(current_commit)
+                else:
+                    commits = [current_commit]
+                changed_files = set()
+                for sha in commits:
+                    for file in get_changed_files(sha):
+                        changed_files.add(file)
+                # העברה למיקום הסופי רק של הקבצים ששונו (הגרסה האחרונה מה-ZIP)
                 for file in changed_files:
-                    run_command(f"sudo -n mv {extracted_dir}/{file} {DEPLOY_PATH}/{file}")
+                    src = os.path.join(extracted_dir, file)
+                    dst = os.path.join(DEPLOY_PATH, file)
+                    dst_dir = os.path.dirname(dst)
+                    if not os.path.exists(dst_dir):
+                        os.makedirs(dst_dir, exist_ok=True)
+                    if os.path.exists(src):
+                        run_command(f"sudo -n mv '{src}' '{dst}'")
             else:
-                # העברה של כל הקבצים
                 run_command(f"sudo -n rm -rf {DEPLOY_PATH}/*")
                 run_command(f"sudo -n mv {extracted_dir}/* {DEPLOY_PATH}/")
-            
             run_command(f"sudo -n chown -R www-data:www-data {DEPLOY_PATH}")
-            
-            # הרצת setup.sh אם קיים
-            setup_success = True  # דגל להצלחת setup.sh
-            
+            setup_success = True
             if os.path.exists(f"{DEPLOY_PATH}/setup.sh"):
                 current_dir = os.getcwd()
                 os.chdir(DEPLOY_PATH)
                 run_command("sudo chmod +x setup.sh")
-                
                 log_message("מריץ את setup.sh")
                 try:
                     if RUN_SETUP_SCRIPT:
-                        # הרצה עם פרמטר production
                         process = os.popen(f"sudo -n {DEPLOY_PATH}/setup.sh production 2>&1")
                         output = process.read()
                         install_result = process.close()
                     else:
-                        # הרצה ללא פרמטרים - ללא sudo
                         install_result = os.system("./setup.sh")
                         output = "הרצה הושלמה" if install_result == 0 else f"נכשל עם קוד שגיאה: {install_result}"
-                    
-                    if install_result == 0:  # הצלחה
+                    if install_result == 0:
                         log_message("setup.sh הסתיים בהצלחה")
                         log_message(f"פלט:\n{output}")
                     else:
-                        error_code = install_result >> 8  # המרת קוד השגיאה לפורמט תקין
+                        error_code = install_result >> 8
                         log_message(f"שגיאה בהרצת setup.sh. קוד שגיאה: {error_code}")
                         log_message(f"פלט:\n{output}")
                         setup_success = False
-                        
                 except Exception as e:
                     log_message(f"שגיאה בהרצת setup.sh: {str(e)}")
                     setup_success = False
-                    
                 os.chdir(current_dir)
             else:
                 log_message("קובץ setup.sh לא נמצא")
-            
-            # עדכון הקומיט האחרון בכל מקרה, גם אם setup.sh נכשל
             save_state(current_commit)
             log_message("התקנה הושלמה" + (" בהצלחה" if setup_success else " עם שגיאות ב-setup.sh"))
-            return True  # מחזירים True גם אם setup.sh נכשל
-        
+            return True
     except Exception as e:
         log_message(f"שגיאה בתהליך ההתקנה: {str(e)}")
         return False
-        
     finally:
-        # ניקוי קבצים זמניים
         if os.path.exists(zip_path):
             os.remove(zip_path)
         if os.path.exists(extracted_dir):
