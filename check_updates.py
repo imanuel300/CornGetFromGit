@@ -705,26 +705,13 @@ def main():
         observer = Observer()
         observer.schedule(event_handler, CONFIG_WATCH_DIR, recursive=False)
         observer.start()
-        
-        last_auto_check = 0
-        
+
         try:
             while True:
-                current_time = time.time()
-                
-                # בדיקת עדכונים אוטומטית כל 10 דקות
-                if current_time - last_auto_check >= AUTO_CHECK_INTERVAL:
-                    log_message("מתחיל בדיקה תקופתית...")
-                    check_processed_configs()
-                    last_auto_check = current_time
-                    log_message(f"הבדיקה הבאה תתבצע בעוד {AUTO_CHECK_INTERVAL/60} דקות")
-                
                 time.sleep(1)
-                
         except KeyboardInterrupt:
             observer.stop()
             observer.join()
-            
     finally:
         release_lock(lock_fd)
 
