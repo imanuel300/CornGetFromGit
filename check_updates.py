@@ -273,7 +273,7 @@ def run_single_check(config_file=None):
     try:
         if config_file and not load_config(config_file):
             return False
-            
+        
         if not REPO_OWNER or not REPO_NAME:
             log_message("חסרות הגדרות בסיסיות (REPO_OWNER, REPO_NAME)")
             return False
@@ -282,25 +282,23 @@ def run_single_check(config_file=None):
         if not current_commit:
             log_message("לא הצלחתי לקבל את הקומיט האחרון")
             return False
-            
+        
         last_known_commit = load_state()
         log_message(f"קומיט נוכחי: {current_commit}, קומיט אחרון ידוע: {last_known_commit}")
-        
-        # אם אין קומיט ידוע, נשמור את הנוכחי ונחזיר הצלחה
-        if not last_known_commit:
-            log_message("אין קומיט ידוע קודם, שומר את הנוכחי")
-            save_state(current_commit)
-            return True
-            
-        if current_commit != last_known_commit:
-            log_message("נמצא עדכון חדש")
-            if deploy_latest_version():
+
+        if UPDATE_ONLY_CHANGED_FILES:
+            # תמיד נבצע פריסה של הקבצים ששונו בקומיט האחרון (או בטווח)
+            deploy_latest_version()
+            # נשמור את הקומיט רק אם יש שינוי
+            if current_commit != last_known_commit:
                 save_state(current_commit)
-                return True
-        else:
-            log_message("אין עדכונים חדשים")
             return True
-            
+        else:
+            # תמיד פריסה מלאה
+            deploy_latest_version()
+            if current_commit != last_known_commit:
+                save_state(current_commit)
+            return True
         return False
     except Exception as e:
         log_message(f"שגיאה: {str(e)}")
