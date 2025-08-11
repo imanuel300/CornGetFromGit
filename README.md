@@ -1,10 +1,13 @@
+
 # מערכת עדכון אוטומטית מ-GitHub
 
-מערכת זו מאפשרת עדכון אוטומטי של קבצים מ-GitHub למערכת הפעלה. המערכת תומכת בשני מצבי עבודה:
+מערכת זו מאפשרת עדכון אוטומטי של קבצים מ-GitHub למערכת הפעלה. המערכת תומכת בשלושה מצבי עבודה:
 1. עדכון אוטומטי - בדיקת עדכונים כל 10 דקות
 2. עדכון ידני - על ידי הוספת קובץ הגדרות לתיקיית `pending`
+3. פריסה מחדש (Redeploy) של קובץ הגדרות קיים דרך Endpoint HTTP (ראה בהמשך)
 
 ## מבנה המערכת
+
 
 ```
 CornGetFromGit/
@@ -14,6 +17,26 @@ CornGetFromGit/
 ├── update_process.log # קובץ לוג
 └── last_commit.json   # מעקב אחר קומיטים
 ```
+
+### דוגמת קריאה ל-API
+
+```http
+POST /deploy/<filename>?RUN_SETUP_SCRIPT=True&UPDATE_ONLY_CHANGED_FILES=True
+```
+
+- `<filename>` – שם קובץ ה-JSON (למשל: `auto_check.json`)
+- ניתן לשלוח גם ב-GET
+
+#### דוגמה ב-curl:
+```bash
+curl -X POST "http://localhost:5000/deploy/auto_check.json?RUN_SETUP_SCRIPT=True&UPDATE_ONLY_CHANGED_FILES=True"
+```
+
+- הקריאה תעביר את הקובץ מ-`processed` ל-`pending` ותעדכן את הפרמטרים בקובץ.
+- המערכת תזהה את הקובץ ותבצע פריסה מחדש לפי ההגדרות החדשות.
+
+### מימוש פנימי
+ב-`check_updates.py` קיימת פונקציה בשם `redeploy_config_file` שמבצעת את ההעברה והעדכון. ניתן לייבא ולהשתמש בה גם בסקריפטים אחרים.
 
 ## קובץ הגדרות
 

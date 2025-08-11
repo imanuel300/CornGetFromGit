@@ -1,17 +1,72 @@
+
 #!/usr/bin/python3
 
-import requests
-import zipfile
+
 import os
+import sys
 import time
 import json
-import urllib3
-import sys
-import subprocess
+import shutil
 import errno
+import requests
+import zipfile
+import urllib3
+import subprocess
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import getpass
+
+# Flask API for deployment endpoint
+try:
+    from flask import Flask, request, jsonify
+    FLASK_AVAILABLE = True
+except ImportError:
+    FLASK_AVAILABLE = False
+if FLASK_AVAILABLE:
+    app = Flask(__name__)
+
+    @app.route('/deploy/<filename>', methods=['POST'])
+    def deploy_config(filename):
+        run_setup_script = request.args.get('RUN_SETUP_SCRIPT')
+        update_only_changed_files = request.args.get('UPDATE_ONLY_CHANGED_FILES')
+
+        # Parse boolean values from query string
+        def parse_bool(val):
+            if val is None:
+                return None
+            if isinstance(val, bool):
+                return val
+            return str(val).lower() in ['1', 'true', 'yes']
+
+        run_setup_script = parse_bool(run_setup_script)
+        update_only_changed_files = parse_bool(update_only_changed_files)
+
+        src = os.path.join(CONFIG_PROCESSED_DIR, filename)
+        dst = os.path.join(CONFIG_WATCH_DIR, filename)
+        if not os.path.exists(src):
+            log_message(f"קובץ {filename} לא נמצא ב-processed")
+            return jsonify({'success': False, 'message': 'File not found'}), 400
+        try:
+            # קריאת הקובץ ועדכון פרמטרים אם צריך
+            with open(src, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            changed = False
+            if run_setup_script is not None:
+                config['run_setup_script'] = run_setup_script
+                changed = True
+            if update_only_changed_files is not None:
+                config['update_only_changed_files'] = update_only_changed_files
+                changed = True
+            if changed:
+                with open(src, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=4, ensure_ascii=False)
+            shutil.move(src, dst)
+            log_message(f"הקובץ {filename} הועבר מ-processed ל-pending בהצלחה")
+            return jsonify({'success': True, 'message': 'Moved successfully'}), 200
+        except Exception as e:
+            log_message(f"שגיאה בהעברת קובץ {filename}: {str(e)}")
+            return jsonify({'success': False, 'message': str(e)}), 400
+
 
 # התעלמות מאזהרות SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -718,4 +773,7 @@ def main():
 if __name__ == '__main__':
     current_user = getpass.getuser()
     log_message(f"הסקריפט רץ תחת המשתמש: {current_user}")
-    sys.exit(0 if main() else 1) 
+    if FLASK_AVAILABLE and len(sys.argv) > 1 and sys.argv[1] == '--api':
+        app.run(host='0.0.0.0', port=5000)
+    else:
+        sys.exit(0 if main() else 1)
