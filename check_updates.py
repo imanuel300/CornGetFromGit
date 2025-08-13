@@ -25,7 +25,7 @@ except ImportError:
 if FLASK_AVAILABLE:
     app = Flask(__name__)
 
-    @app.route('/deploy/<filename>', methods=['POST'])
+    @app.route('/deploy/<filename>', methods=['GET'])
     def deploy_config(filename):
         run_setup_script = request.args.get('RUN_SETUP_SCRIPT')
         update_only_changed_files = request.args.get('UPDATE_ONLY_CHANGED_FILES')

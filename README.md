@@ -21,7 +21,7 @@ CornGetFromGit/
 ### דוגמת קריאה ל-API
 
 ```http
-POST /deploy/<filename>?RUN_SETUP_SCRIPT=True&UPDATE_ONLY_CHANGED_FILES=True
+GET /deploy/<filename>?RUN_SETUP_SCRIPT=True&UPDATE_ONLY_CHANGED_FILES=True
 ```
 
 - `<filename>` – שם קובץ ה-JSON (למשל: `auto_check.json`)
@@ -29,7 +29,7 @@ POST /deploy/<filename>?RUN_SETUP_SCRIPT=True&UPDATE_ONLY_CHANGED_FILES=True
 
 #### דוגמה ב-curl:
 ```bash
-curl -X POST "http://localhost:5000/deploy/auto_check.json?RUN_SETUP_SCRIPT=True&UPDATE_ONLY_CHANGED_FILES=True"
+curl -X GET "http://localhost:5000/deploy/auto_check.json?RUN_SETUP_SCRIPT=True&UPDATE_ONLY_CHANGED_FILES=True"
 ```
 
 - הקריאה תעביר את הקובץ מ-`processed` ל-`pending` ותעדכן את הפרמטרים בקובץ.
@@ -116,6 +116,7 @@ sudo -u www-data /usr/bin/python3 /var/www/html/CornGetFromGit/check_updates.py 
 
 # בדיקת סטטוס השירות
 systemctl | grep update_checker
+sudo systemctl status update_checker
 
 ```
 
