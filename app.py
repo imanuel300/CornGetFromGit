@@ -1,7 +1,4 @@
-
 #!/usr/bin/python3
-
-
 import os
 import sys
 import time
@@ -823,6 +820,35 @@ def main():
             observer.join()
     finally:
         release_lock(lock_fd)
+
+def start_watcher():
+    """מפעיל את ה-Watcher בתהליך נפרד"""
+    try:
+        if not validate_directories():
+            log_message("שגיאה: לא ניתן לוודא תקינות תיקיות")
+            return False
+
+        lock_fd = acquire_lock()
+        if not lock_fd:
+            return False
+
+        if not check_permissions():
+            log_message("שגיאה: לא ניתן להגדיר הרשאות נדרשות")
+            return False
+
+        log_message("התחלת מעקב אחר שינויים...")
+        event_handler = ConfigFileHandler()
+        observer = Observer()
+        observer.schedule(event_handler, CONFIG_WATCH_DIR, recursive=False)
+        observer.start()
+        return observer
+    except Exception as e:
+        log_message(f"שגיאה בהפעלת Watcher: {str(e)}")
+        return None
+
+# הפעלת Watcher כשמריצים עם Gunicorn
+if FLASK_AVAILABLE:
+    observer = start_watcher()
 
 if __name__ == '__main__':
     current_user = getpass.getuser()

@@ -1,9 +1,9 @@
 [Unit]
-Description=check updates Service (Gunicorn - Unix Socket)
+Description=Check Updates Service (Gunicorn + File Watcher)
 After=network.target
 
 [Service]
-User=www-data
+User=root
 Group=www-data
 WorkingDirectory=/var/www/html/CornGetFromGit
 
