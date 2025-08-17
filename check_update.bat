@@ -1,5 +1,5 @@
 @echo off
-python "%LOCALAPPDATA%\CornGetFromGit\check_updates.py" --single
+python "%LOCALAPPDATA%\CornGetFromGit\app.py" --single
 if errorlevel 1 (
     echo Failed to update
     exit /b 1

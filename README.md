@@ -13,7 +13,7 @@
 CornGetFromGit/
 ├── pending/           # תיקייה לקבצי הגדרות חדשים
 ├── processed/         # תיקייה לקבצי הגדרות שעובדו
-├── check_updates.py   # הסקריפט הראשי
+├── app.py   # הסקריפט הראשי
 ├── update_process.log # קובץ לוג
 └── last_commit.json   # מעקב אחר קומיטים
 ```
@@ -36,7 +36,7 @@ curl -X GET "http://localhost:5000/deploy/auto_check.json?RUN_SETUP_SCRIPT=True&
 - המערכת תזהה את הקובץ ותבצע פריסה מחדש לפי ההגדרות החדשות.
 
 ### מימוש פנימי
-ב-`check_updates.py` קיימת פונקציה בשם `redeploy_config_file` שמבצעת את ההעברה והעדכון. ניתן לייבא ולהשתמש בה גם בסקריפטים אחרים.
+ב-`app.py` קיימת פונקציה בשם `redeploy_config_file` שמבצעת את ההעברה והעדכון. ניתן לייבא ולהשתמש בה גם בסקריפטים אחרים.
 
 ## קובץ הגדרות
 
@@ -112,7 +112,7 @@ sudo systemctl restart update_checker
 tail -f /var/www/html/CornGetFromGit/update_process.log
 
 # בדיקה ידנית
-sudo -u www-data /usr/bin/python3 /var/www/html/CornGetFromGit/check_updates.py --single
+sudo -u www-data /usr/bin/python3 /var/www/html/CornGetFromGit/app.py --single
 
 # בדיקת סטטוס השירות
 systemctl | grep update_checker
@@ -124,7 +124,7 @@ sudo systemctl status update_checker
 
 המערכת רצה תחת המשתמש `www-data` ודורשת הרשאות מתאימות:
 - קריאה/כתיבה לתיקיות `pending` ו-`processed`
-- הרשאות הרצה לסקריפט `check_updates.py`
+- הרשאות הרצה לסקריפט `app.py`
 - הרשאות כתיבה לקובץ הלוג
 
 ## פתרון בעיות

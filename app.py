@@ -25,8 +25,43 @@ except ImportError:
 if FLASK_AVAILABLE:
     app = Flask(__name__)
 
+    @app.route('/deploy/', defaults={'filename': None}, methods=['GET'])
     @app.route('/deploy/<filename>', methods=['GET'])
     def deploy_config(filename):
+        # If no filename provided, return usage instructions
+        if not filename:
+            # Get the full URL for the endpoint
+            base_url = request.url_root.rstrip('/')
+            usage_guide = {
+                'success': False,
+                'message': 'Missing filename parameter',
+                'usage': {
+                    'base_url': base_url,
+                    'full_endpoint': f"{base_url}/deploy/<filename>",
+                    'endpoint': '/deploy/<filename>',
+                    'method': 'GET',
+                    'required_parameters': {
+                        'filename': 'Name of the configuration file (must exist in processed directory)'
+                    },
+                    'optional_parameters': {
+                        'RUN_SETUP_SCRIPT': {
+                            'type': 'boolean',
+                            'default': False,
+                            'description': 'Whether to run setup.sh after deployment',
+                            'valid_values': ['true', 'false', '1', '0', 'yes', 'no']
+                        },
+                        'UPDATE_ONLY_CHANGED_FILES': {
+                            'type': 'boolean',
+                            'default': True,
+                            'description': 'Whether to update only changed files or perform full deployment',
+                            'valid_values': ['true', 'false', '1', '0', 'yes', 'no']
+                        }
+                    },
+                    'example': '/deploy/my_config.json?RUN_SETUP_SCRIPT=true&UPDATE_ONLY_CHANGED_FILES=true'
+                }
+            }
+            return jsonify(usage_guide), 400
+
         run_setup_script = request.args.get('RUN_SETUP_SCRIPT')
         update_only_changed_files = request.args.get('UPDATE_ONLY_CHANGED_FILES')
 
@@ -43,9 +78,28 @@ if FLASK_AVAILABLE:
 
         src = os.path.join(CONFIG_PROCESSED_DIR, filename)
         dst = os.path.join(CONFIG_WATCH_DIR, filename)
+        
+        # Check if the file exists and provide guidance
         if not os.path.exists(src):
+            error_response = {
+                'success': False,
+                'message': f'File {filename} not found in processed directory',
+                'help': {
+                    'possible_issues': [
+                        'The file name might be incorrect',
+                        'The file might not be processed yet',
+                        'The file might have been deleted'
+                    ],
+                    'what_to_do': [
+                        'Check if the filename is correct',
+                        'Ensure the configuration file exists in the processed directory',
+                        'Try processing the configuration file first'
+                    ],
+                    'available_files': os.listdir(CONFIG_PROCESSED_DIR) if os.path.exists(CONFIG_PROCESSED_DIR) else []
+                }
+            }
             log_message(f"קובץ {filename} לא נמצא ב-processed")
-            return jsonify({'success': False, 'message': 'File not found'}), 400
+            return jsonify(error_response), 400
         try:
             # קריאת הקובץ ועדכון פרמטרים אם צריך
             with open(src, 'r', encoding='utf-8') as f:
@@ -500,7 +554,7 @@ def check_processed_configs():
             try:
                 import psutil
                 for proc in psutil.process_iter(['pid', 'name']):
-                    if 'setup.sh' in proc.info['name'] or 'check_updates.py' in proc.info['name']:
+                    if 'setup.sh' in proc.info['name'] or 'app.py' in proc.info['name']:
                         log_message(f"יש תהליך התקנה פעיל (PID: {proc.info['pid']})")
                         return
             except ImportError:
@@ -508,7 +562,7 @@ def check_processed_configs():
                 return
         else:  # Linux/Unix
             try:
-                output = subprocess.check_output(['pgrep', '-f', 'setup.sh|check_updates.py']).decode()
+                output = subprocess.check_output(['pgrep', '-f', 'setup.sh|app.py']).decode()
                 if output.strip():
                     log_message("זוהה תהליך התקנה פעיל, דילוג על בדיקת עדכונים")
                     return
@@ -626,7 +680,7 @@ def acquire_lock():
         else:  # Linux/Unix
             # בדיקת תהליכים קיימים
             try:
-                output = subprocess.check_output(['pgrep', '-f', 'setup.sh|check_updates.py']).decode()
+                output = subprocess.check_output(['pgrep', '-f', 'setup.sh|app.py']).decode()
                 pids = output.strip().split('\n')
                 current_pid = str(os.getpid())
                 other_pids = [pid for pid in pids if pid != current_pid]

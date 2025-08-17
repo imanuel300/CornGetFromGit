@@ -21,9 +21,13 @@ sudo chmod 664 /var/www/html/CornGetFromGit/last_commit.json
 sudo chmod 664 /var/www/html/CornGetFromGit/check_updates.lock
 
 # העתקת והגדרת הרשאות לסקריפט הראשי
-sudo cp check_updates.py /var/www/html/CornGetFromGit/
-sudo chown www-data:www-data /var/www/html/CornGetFromGit/check_updates.py
-sudo chmod 755 /var/www/html/CornGetFromGit/check_updates.py
+sudo cp app.py /var/www/html/CornGetFromGit/
+sudo chown www-data:www-data /var/www/html/CornGetFromGit/app.py
+sudo chmod 755 /var/www/html/CornGetFromGit/app.py
+
+cp update_checker.conf /etc/nginx/sites-available/
+# יצירת קישור סימבולי לאפשר את האתר
+ln -sf /etc/nginx/sites-available/update_checker.conf /etc/nginx/sites-enabled/
 
 # העתקת והגדרת שירות המערכת
 sudo cp update_checker.service /etc/systemd/system/
@@ -32,7 +36,8 @@ sudo chmod 644 /etc/systemd/system/update_checker.service
 # הפעלת השירות
 sudo systemctl daemon-reload
 sudo systemctl enable update_checker
-sudo systemctl start update_checker
+sudo systemctl restart update_checker
+sudo systemctl restart nginx
 
 # הוספת הרשאות sudo ספציפיות ל-www-data
 echo "www-data ALL=(ALL) NOPASSWD: /bin/chown -R www-data\:www-data /var/www/html/CornGetFromGit/*" | sudo tee -a /etc/sudoers.d/www-data-updates

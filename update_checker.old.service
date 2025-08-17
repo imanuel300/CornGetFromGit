@@ -1,0 +1,19 @@
+[Unit]
+Description=GitHub Auto Update Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=www-data
+WorkingDirectory=/var/www/html/CornGetFromGit
+ExecStart=/usr/bin/python3 /var/www/html/CornGetFromGit/app.py
+Restart=on-failure
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=3
+KillMode=process
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target 

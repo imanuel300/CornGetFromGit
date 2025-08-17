@@ -1,19 +1,32 @@
 [Unit]
-Description=GitHub Auto Update Service
+Description=check updates Service (Gunicorn - Unix Socket)
 After=network.target
 
 [Service]
-Type=simple
-User=root
+User=www-data
 Group=www-data
 WorkingDirectory=/var/www/html/CornGetFromGit
-ExecStart=/usr/bin/python3 /var/www/html/CornGetFromGit/check_updates.py
-Restart=on-failure
-RestartSec=30
-StartLimitInterval=300
-StartLimitBurst=3
-KillMode=process
-TimeoutStopSec=5
+
+ExecStart=/usr/bin/gunicorn \
+    --workers 1 \
+    --threads 1 \
+    --worker-class=gthread \
+    --worker-connections=1000 \
+    --timeout 300 \
+    --graceful-timeout 300 \
+    --keep-alive 5 \
+    --bind unix:/var/www/html/CornGetFromGit/app.sock \
+    --log-level debug \
+    --max-requests 1000 \
+    --max-requests-jitter 50 \
+    app:app
+
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+TimeoutStartSec=600
+TimeoutStopSec=600
+
+Restart=always
+RestartSec=5
 
 [Install]
-WantedBy=multi-user.target 
+WantedBy=multi-user.target
