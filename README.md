@@ -14,7 +14,7 @@ CornGetFromGit/
 ├── pending/           # תיקייה לקבצי הגדרות חדשים
 ├── processed/         # תיקייה לקבצי הגדרות שעובדו
 ├── app.py   # הסקריפט הראשי
-├── update_process.log # קובץ לוג
+├── log.log # קובץ לוג
 └── last_commit.json   # מעקב אחר קומיטים
 ```
 
@@ -89,7 +89,7 @@ sudo systemctl start update_checker
 
 ## מעקב אחר עדכונים
 
-- הלוגים נשמרים ב-`update_process.log`
+- הלוגים נשמרים ב-`log.log`
 - קבצי ההגדרות המעובדים ב-`processed` מכילים היסטוריית עדכונים
 - ניתן לראות את סטטוס השירות:
 ```bash
@@ -109,7 +109,7 @@ sudo systemctl stop update_checker
 sudo systemctl restart update_checker
 
 # צפייה בלוגים
-tail -f /var/www/html/CornGetFromGit/update_process.log
+tail -f /var/www/html/CornGetFromGit/log.log
 
 # בדיקה ידנית
 sudo -u www-data /usr/bin/python3 /var/www/html/CornGetFromGit/app.py --single
@@ -131,7 +131,7 @@ sudo systemctl status update_checker
 
 1. בדוק את הלוגים:
 ```bash
-tail -f /var/www/html/CornGetFromGit/update_process.log
+tail -f /var/www/html/CornGetFromGit/log.log
 ```
 
 2. וודא הרשאות:

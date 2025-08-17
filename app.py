@@ -129,7 +129,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 BASE_DIR = "/var/www/html/CornGetFromGit"
 CONFIG_WATCH_DIR = f"{BASE_DIR}/pending"  # תיקייה לקבצי הגדרות חדשים
 CONFIG_PROCESSED_DIR = f"{BASE_DIR}/processed"  # תיקייה לקבצים שעובדו
-LOG_FILE = f"{BASE_DIR}/update_process.log"
+LOG_FILE = f"{BASE_DIR}/log.log"
 STATE_FILE = f"{BASE_DIR}/last_commit.json"
 
 # מרווחי זמן לבדיקות

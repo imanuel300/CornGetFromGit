@@ -8,15 +8,15 @@ sudo chown -R www-data:www-data /var/www/html/CornGetFromGit
 sudo chmod -R 775 /var/www/html/CornGetFromGit
 
 # יצירת קבצי מערכת
-sudo touch /var/www/html/CornGetFromGit/update_process.log
+sudo touch /var/www/html/CornGetFromGit/log.log
 sudo touch /var/www/html/CornGetFromGit/last_commit.json
 sudo touch /var/www/html/CornGetFromGit/check_updates.lock
 
 # הגדרת הרשאות לקבצים
-sudo chown www-data:www-data /var/www/html/CornGetFromGit/update_process.log
+sudo chown www-data:www-data /var/www/html/CornGetFromGit/log.log
 sudo chown www-data:www-data /var/www/html/CornGetFromGit/last_commit.json
 sudo chown www-data:www-data /var/www/html/CornGetFromGit/check_updates.lock
-sudo chmod 664 /var/www/html/CornGetFromGit/update_process.log
+sudo chmod 664 /var/www/html/CornGetFromGit/log.log
 sudo chmod 664 /var/www/html/CornGetFromGit/last_commit.json
 sudo chmod 664 /var/www/html/CornGetFromGit/check_updates.lock
 
