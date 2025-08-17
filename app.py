@@ -22,8 +22,9 @@ except ImportError:
 if FLASK_AVAILABLE:
     app = Flask(__name__)
 
-    @app.route('/deploy/', defaults={'filename': None}, methods=['GET'])
-    @app.route('/deploy/<filename>', methods=['GET'])
+    @app.route('/deploy', defaults={'filename': None}, methods=['GET'], strict_slashes=False)  # ללא סלאש
+    @app.route('/deploy/', defaults={'filename': None}, methods=['GET'], strict_slashes=False)  # עם סלאש
+    @app.route('/deploy/<filename>', methods=['GET'], strict_slashes=False)  # עם שם קובץ
     def deploy_config(filename):
         # If no filename provided, return usage instructions
         if not filename:
